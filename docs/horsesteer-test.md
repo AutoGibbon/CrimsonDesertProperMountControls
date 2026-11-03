@@ -41,18 +41,127 @@ Spend about 10 seconds on each. Write what happened in the Results section below
 
 ## Results
 
+| Step                        | What happened                                                                          |
+| --------------------------- | -------------------------------------------------------------------------------------- |
+| 1. On foot                  | normal walking all good                                                                |
+| 2. Hold W                   | went straight!                                                                         |
+| 3. Hold W, swing camera     | went straight!                                                                         |
+| 4. Mod off, swing camera    | horse turned to camera heading before beginning movement                               |
+| 5. W with A, W with D       | horse turns toward the given steering input while moving forward, exactly what we want |
+| 6. A, then D, from standing | horse does a small radius walk while turning toward the given steering input, perfect  |
+| 7. S from standing          | horse has no idea what to do :D, maybe they didn't code a backwards walk?              |
+| 8. After dismounting        | yes back to normal on foot controls                                                    |
+
+- Did you need Shift+F5? (yes / no): no
+- Any crash or freeze? (which step, and what you were doing): no
+- Which way is "left" in step 5: the horse's left, or something else? A = left = horse's left, D = right = horse's right
+- Notes: for this test I disabled the camera follow and camera lookahead settings.
+
+# Stage 2 test
+
+This build makes S a brake and limits the mod to horse-type mounts. Reversing isn't possible through input, because the horse chart has no route into its backward walk.
+
+## Setup
+
+1. Close the game. In DMM, turn `HorseSteer` off and on again and apply, so the new build is copied to `bin64`. Check the log's first lines mention "hooks installed".
+2. Load your save and wait until at least 20 seconds after launch.
+
+## Steps
+
+1. **Ride with W, A and D at a trot:** this should feel the same as before. If nothing has changed from the game's normal controls, stop and report it, as the horse check has failed.
+2. **Hold W, then release W and hold S at a trot or gallop:** the horse should slow down and stop, without turning around.
+3. **Standing still, hold S:** the horse should stay put.
+4. **Hold S with A, then S with D:** the horse should act as if only A or D were held.
+5. **Other mounts, if you have one available that isn't horse-based, such as the exosuit or a bear:** the controls should be the game's normal ones.
+6. **Other horse-type mounts, if you have one, such as a golem horse or donkey:** the horse controls should apply.
+
+Leave `HorseSteer` enabled until the logs have been read.
+
+## Stage 2 results
+
 | Step | What happened |
 | --- | --- |
-| 1. On foot | |
-| 2. Hold W | |
-| 3. Hold W, swing camera | |
-| 4. Mod off, swing camera | |
-| 5. W with A, W with D | |
-| 6. A, then D, from standing | |
-| 7. S from standing | |
-| 8. After dismounting | |
+| 1. W, A and D at a trot | has reverted to base controls, no more horse relative movement, other steps not tested due to regression |
+| 2. S to brake | |
+| 3. S from standing | |
+| 4. S with A or D | |
+| 5. Non-horse mount | |
+| 6. Other horse-type mount | |
 
-- Did you need Shift+F5? (yes / no):
-- Any crash or freeze? (which step, and what you were doing):
-- Which way is "left" in step 5: the horse's left, or something else?
+- Any crash or freeze?
+- Notes:
+
+# Stage 2b test
+
+The first stage 2 run failed because the horse check couldn't read the mount's identity, which switched the mod off. This
+build applies to every mount again, and writes `HorseSteer_mountscan.txt` the first time you ride each one, so a working
+horse check can be built from it.
+
+## Setup
+
+1. Close the game. In DMM, turn `HorseSteer` off and on again and apply, so the new build is copied to `bin64`.
+2. Load your save and wait until at least 20 seconds after launch.
+
+## Steps
+
+1. **Ride with W, A and D at a trot:** the horse-relative controls should be back.
+2. **Hold W, then release W and hold S at a trot or gallop:** the horse should slow down and stop, without turning around.
+3. **Standing still, hold S:** the horse should stay put.
+4. **Hold S with A, then S with D:** the horse should act as if only A or D were held.
+5. **Ride any other mounts you can reach, for about 10 seconds each, including the exosuit if available:** this gives the
+   scan something to compare. The mod applies to them in this build, so expect odd controls. Note what each mount was.
+
+F5 and logging pause for up to 8 seconds during each scan, though steering and the game should keep running. Leave
+`HorseSteer` enabled until the logs have been read.
+
+## Stage 2b results
+
+| Step | What happened |
+| --- | --- |
+| 1. W, A and D at a trot | expected behaviour |
+| 2. S to brake | no noticable difference between just releasing w on its own |
+| 3. S from standing | nothing happens |
+| 4. S with A or D | horse turns toward steer input, at 90 degree steps, appears to be doing best effort to turn in place with any forward movement at all, this is different from S and D alone where the horse will walk in small radius toward steering direction |
+| 5. Other mounts ridden, in order | n/a |
+
+- Any crash or freeze?
+- Notes: holding S and a steer input while in motion behaves similarly to holding W and steer input (less steering)
+other note. W and steer starting to feel counterproductive especially at low speed like moving from a standstill. turn radius is very big when setting off with W and A/D.
+
+# Stage 3 test
+
+This build limits the mod to land mounts by their action package, tightens W+A and W+D turns when setting off, and slightly
+increases them in motion. The steering numbers are a starting point, so report how they feel.
+
+## Setup
+
+1. Close the game. In DMM, turn `HorseSteer` off and on again and apply, so the new build is copied to `bin64`.
+2. Load your save and wait until at least 20 seconds after launch.
+
+## Steps
+
+1. **Mount your horse and hold W:** the horse should go straight. If the game's normal controls are back, stop and report it,
+   as the mount check has failed.
+2. **From standing, hold W and A, then W and D:** the turn should be much tighter than before.
+3. **At a walk, trot and gallop, hold W and tap or hold A or D:** the turn should be slightly quicker than before. Check that it
+   doesn't feel twitchy, especially when moving from walk to trot, where the steering angle changes.
+4. **Hold W and swing the camera:** the horse should still go straight.
+5. **From standing, hold S and A, then S and D:** the pivot should be unchanged.
+6. **Any other mount, if you get access to one:** ride it briefly and note the name and how it behaves.
+
+Leave `HorseSteer` enabled until the logs have been read.
+
+## Stage 3 results
+
+| Step | What happened |
+| --- | --- |
+| 1. W on horse | |
+| 2. W with A or D from standing | |
+| 3. W with A or D in motion | |
+| 4. W with camera swing | |
+| 5. S with A or D | |
+| 6. Other mounts | |
+
+- Any crash or freeze?
+- Too tight, too loose, or about right?
 - Notes:

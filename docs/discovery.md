@@ -11,8 +11,12 @@ Replicate Red Dead Redemption 2's horse-relative controls, through a native ASI 
 
 ## Requirements
 
-- **Forward/back:** W and S are the only inputs that change the horse's position, and they move it along its own facing.
-- **Steering:** A and D change the horse's heading while held and do not move it sideways.
+- **Forward/back:** W moves the horse along its own facing. S should be a hard brake, slowing the horse faster than releasing W.
+  This is planned after stage 3; S currently only clears backward input, which coasts like releasing W. RDR2 also backs up,
+  but the horse chart has no route into its backward walk.
+- **Steering:** A and D change the horse's heading while held. With no other input the horse walks in a small radius,
+  and releasing W while steering at speed gives a tighter turn. The user wants to keep both behaviours.
+- **Pivot:** S with A or D turns the horse nearly on the spot, at about 52°/s and 0.5 m/s, and the user wants to keep it.
 - **Camera:** looking around freely never changes the horse's course.
 - **Input:** keyboard and mouse. Controller support is optional for now.
 - **Mounts:** horses and ground mounts based on them. The exosuit/mech suit is excluded.
@@ -30,14 +34,11 @@ against the mount's facing, so the camera stays free. Test status is in `docs/ho
 
 | Unknown | Status |
 | --- | --- |
-| Whether movement uses these angles | Hypothesis; stage 1 test |
-| Forward sign | Inferred from the angle code; stage 1 test, with Shift+F5 to flip it |
-| Horse-type mount check | Not done; the mod currently applies to anything ridden |
-| Turning without moving | Not solved; the horse does rotate in place before moving off when facing away from the input |
-| Reversing | `walk_b` clips exist in the horse chart; how to reach them from input is unknown |
-| Camera heading in telemetry | Not needed by the mod; `HorseSteer` logs it from the component's copied vector |
-
-Turning without moving is the highest risk.
+| Forward, steering and free look | Working at walk, trot and gallop, tested in game |
+| Reversing | Not reachable through input: `walk_b_stt`, `ing` and `end` have no branch in from any other state. Backward stick input is cleared at `exe+0xB6C5A6` instead |
+| Hard brake on S | Not started. The horse chart has a `key_brake` input, so S may be able to trigger it by answering a game key check at `exe+0x3B0150`; this is untraced |
+| Mount check | Awaiting test: the action package name at `[[[[mount+0x68]+0x40]+0x28]+0x18]+0x48` must be in the land-mount list in `HorseSteer.cpp`. Horse confirmed by scan; other mounts are untested and use their own charts. `CD_M0003_CucuBird` is included; it has gliding states that are untested |
+| Game camera follow and lookahead on | Not tested; the game hit a GPU reset when they were turned back on |
 
 The game setting and camera preset routes are ruled out: both work by keeping the camera behind the horse, which breaks
 free look.
@@ -113,6 +114,26 @@ Logs are in `scratch/probe-runs/run1/`.
   cause is not ruled out.
 - **DMM:** a stale `bin64\dmm\manifest.tsv` pointing at a moved mods folder stops saves loading, with a missing
   `decorationparam_cclite_female.xml` error. A full mount rebuilds it. Disabling an ASI in DMM deletes its logs.
+
+### From HorseSteer test runs
+
+Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
+
+- **Result:** during a W hold the camera yaw swung 79° while the horse's heading stayed at 57°. With the mod off, the horse
+  turned towards the camera before moving off.
+- **Forward:** the horse travels 180° from its physics Z axis, so its forward is minus Z.
+- **Mount:** this save's horse key is `0xB0100002`, and the second input component belongs to the horse.
+- **Gaits:** trot and gallop steer as expected. Releasing W while steering gives a tighter turn.
+- **Turn rates at walking speed:** about 34°/s for W with A or D, and about 66°/s for A alone.
+- **Settings crash (14:47):** `user_engine_option_save.xml` was written at 14:47:24, the Nvidia driver logged GPU engine
+  resets (`nvlddmkm` event 153) at 14:47:26 and 14:47:30, and the game then stopped with `DXGI_ERROR_DEVICE_HUNG`. The horse
+  had been idle for over 2 minutes. HorseSteer's hook is CPU-only, so it's an unlikely cause, but it was active.
+- **Camera settings:** with follow and lookahead on from launch, the game starts and runs normally, so the GPU reset is assumed
+  not to be caused by the mod.
+- **Mount scan:** the horse's action package name is `CD_R0001_Horse`. Its appearance path is at a different chain from the protagonists'.
+- **S and steering rates:** S coasts from 6–9 m/s to a stop in about 2.5–4 s. W with A or D turns at 16–30°/s when setting off and
+  37–42°/s at 6–10 m/s. A or D alone turns at 60–66°/s from standing and 83–90°/s at 4 m/s.
+- **Probe freeze (13:57):** Windows logged it as an application hang (`AppHangB1`), not a crash.
 
 ### From other projects, not yet checked on this install
 

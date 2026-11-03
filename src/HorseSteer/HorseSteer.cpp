@@ -1,5 +1,6 @@
-// Horse-relative riding controls: while mounted, replaces the camera direction vectors in
+// Horse-relative riding controls: on ground mounts, replaces the camera direction vectors in
 // ClientInputActorComponent's per-frame update with the mount's, so move input is resolved against the mount's facing.
+// Also widens forward steering angles and removes backward input, which leaves S with a steering input as a pivot.
 //
 // F5        toggle the mod
 // Shift+F5  flip the forward direction
@@ -8,6 +9,7 @@
 #define NOMINMAX
 #include <windows.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdarg>
@@ -30,13 +32,31 @@ constexpr uintptr_t kVtVehicleComponent = 0x593E9D8;
 // Inside ClientInputActorComponent's update (exe+0xB6C3F0), right after it copies the camera vectors.
 constexpr uintptr_t kHookSite = 0xB6C4A6;
 constexpr uint8_t kHookSiteBytes[] = {0x49, 0x8B, 0x40, 0x20, 0x48, 0x8B, 0x88, 0x30, 0x12, 0x00, 0x00};
+// In the same update, right before it reads the raw stick from +0x48.
+constexpr uintptr_t kStickSite = 0xB6C5A6;
+constexpr uint8_t kStickSiteBytes[] = {0x48, 0x8D, 0x77, 0x50, 0x48, 0x8B, 0x47, 0x48};
 
 constexpr uint32_t kInput_Actor = 0x08;
 constexpr uint32_t kInput_Stick = 0x38;
+constexpr uint32_t kInput_RawStick = 0x48;
 constexpr uint32_t kInput_MoveAngle = 0x88;
 constexpr uint32_t kInput_MoveAngleRelative = 0x8C;
 constexpr uint32_t kInput_CameraForward = 0x154;
 constexpr uint32_t kInput_CameraRight = 0x160;
+
+// Land mounts' packages. Water mounts, the dragon and machines are left out.
+constexpr const char* kGroundMountPackages[] = {
+    "CD_R0001_Horse", "CD_M0002_Camel", "CD_M0002_Reindeer", "CD_M0002_Elephant",  "CD_M0002_BattleBoar",
+    "CD_M0002_Bear",  "CD_M0002_Wolf",  "CD_M0002_Wolf_Elite", "CD_M0002_Wolf_Elite_Big", "CD_M0002_Wolf_Boss",
+    "CD_R0034_Iguana", "CD_R0035_CarmaBirdsaurus", "CD_M0003_CucuBird",
+};
+
+// Forward steering multiplies W+A's 45 degree stick angle by these, blending between the two speeds in m/s.
+constexpr float kTightSteerFactor = 80.0f / 45.0f;
+constexpr float kWideSteerFactor = 55.0f / 45.0f;
+constexpr float kTightSteerSpeed = 2.5f;
+constexpr float kWideSteerSpeed = 5.0f;
+constexpr float kMaxSteerAngle = 85.0f / 57.29578f;
 
 constexpr float kMissing = -9999.0f;
 constexpr float kRadToDeg = 57.29578f;
@@ -69,6 +89,9 @@ std::atomic<bool> g_enabled{true};
 std::atomic<bool> g_flip{false};
 InputSample g_samples[2];
 SafetyHookMid g_hook;
+SafetyHookMid g_stickHook;
+std::atomic<uintptr_t> g_groundMount{0};
+std::atomic<float> g_mountSpeed{0};
 
 void Log(const char* fmt, ...) {
     if (!g_log) return;
@@ -191,6 +214,38 @@ Ride ResolveRide() {
     return ride;
 }
 
+// Return the name of a mount's action package, which is the element name in characteractionpackagedescription.xml.
+std::string ReadPackageName(uintptr_t mount) {
+    const uintptr_t components = ReadPtr(mount + 0x68);
+    const uintptr_t control = components ? ReadPtr(components + 0x40) : 0;
+    const uintptr_t owner = control ? ReadPtr(control + 0x28) : 0;
+    const uintptr_t package = owner ? ReadPtr(owner + 0x18) : 0;
+    char name[64] = {};
+    if (!package || !SafeRead(package + 0x48, name, sizeof name - 1)) return {};
+    return std::string(name, strnlen(name, sizeof name - 1));
+}
+
+bool IsGroundMountPackage(const std::string& name) {
+    for (const char* allowed : kGroundMountPackages) {
+        if (name == allowed) return true;
+    }
+    return false;
+}
+
+bool RidingGroundMount(const Ride& ride) {
+    return g_enabled.load() && ride.mounted && ride.mount != 0 && ride.mount == g_groundMount.load();
+}
+
+// Steer a forward stick vector further from straight ahead, by more at low speed, keeping its magnitude.
+void WidenSteering(float& x, float& y, float speed) {
+    const float t = std::clamp((speed - kTightSteerSpeed) / (kWideSteerSpeed - kTightSteerSpeed), 0.0f, 1.0f);
+    const float factor = kTightSteerFactor + (kWideSteerFactor - kTightSteerFactor) * t;
+    const float magnitude = std::hypot(x, y);
+    const float angle = std::min(std::atan2(std::fabs(x), y) * factor, kMaxSteerAngle);
+    x = std::copysign(magnitude * std::sin(angle), x);
+    y = magnitude * std::cos(angle);
+}
+
 // Replace the component's camera forward and right vectors with ones aligned to the mount, keeping their handedness.
 bool ApplyMountDirection(uintptr_t input, const Ride& ride, InputSample& sample) {
     Vec3 forward, right;
@@ -234,8 +289,24 @@ void OnInputUpdate(SafetyHookContext& ctx) {
     sample.relative = relative * kRadToDeg;
 
     bool applied = false;
-    if (g_enabled.load() && ride.mounted && ride.haveForward) applied = ApplyMountDirection(input, ride, sample);
+    if (RidingGroundMount(ride) && ride.haveForward) applied = ApplyMountDirection(input, ride, sample);
     sample.applied = applied;
+}
+
+// Adjust the raw stick before the update reads it: clear backward input, because the horse chart has no route into its
+// backward walk, and widen forward steering.
+void OnStickRead(SafetyHookContext& ctx) {
+    if (!RidingGroundMount(ResolveRide())) return;
+    float stick[2];
+    if (!SafeRead(ctx.rdi + kInput_RawStick, stick, sizeof stick)) return;
+    if (stick[1] < 0.0f) {
+        stick[1] = 0.0f;
+    } else if (stick[1] > 0.0f && std::fabs(stick[0]) > 0.01f) {
+        WidenSteering(stick[0], stick[1], g_mountSpeed.load());
+    } else {
+        return;
+    }
+    SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
 }
 
 bool KeyDown(int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
@@ -264,6 +335,7 @@ void WriteTelemetry(const Ride& ride) {
         const float dt = static_cast<float>(now - lastTick) / 1000.0f;
         const float dx = world.x - lastPos.x, dz = world.z - lastPos.z;
         speed = std::hypot(dx, dz) / dt;
+        g_mountSpeed = speed;
         if (speed > 0.1f) travelYaw = YawDeg(dx, dz);
     }
     if (haveRider) {
@@ -313,17 +385,21 @@ bool InstallHook() {
         Log("unsupported game build: hook not installed");
         return false;
     }
-    if (memcmp(reinterpret_cast<const void*>(g_base + kHookSite), kHookSiteBytes, sizeof kHookSiteBytes) != 0) {
-        Log("hook site bytes differ, possibly another mod's hook: hook not installed");
+    if (memcmp(reinterpret_cast<const void*>(g_base + kHookSite), kHookSiteBytes, sizeof kHookSiteBytes) != 0 ||
+        memcmp(reinterpret_cast<const void*>(g_base + kStickSite), kStickSiteBytes, sizeof kStickSiteBytes) != 0) {
+        Log("hook site bytes differ, possibly another mod's hook: hooks not installed");
         return false;
     }
     auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + kHookSite), OnInputUpdate);
-    if (!hook) {
-        Log("hook failed to install");
+    auto stickHook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + kStickSite), OnStickRead);
+    if (!hook || !stickHook) {
+        Log("hooks failed to install");
         return false;
     }
     g_hook = std::move(*hook);
-    Log("hook installed at exe+0x%llX", static_cast<unsigned long long>(kHookSite));
+    g_stickHook = std::move(*stickHook);
+    Log("hooks installed at exe+0x%llX and exe+0x%llX", static_cast<unsigned long long>(kHookSite),
+        static_cast<unsigned long long>(kStickSite));
     return true;
 }
 
@@ -345,6 +421,8 @@ DWORD WINAPI ModThread(void* param) {
 
     bool f5Was = false, wasMounted = false, wasFromMount = false;
     uintptr_t seen[2] = {};
+    uintptr_t classified = 0;
+    bool reportedUnreadable = false;
     ULONGLONG lastTelemetry = 0;
     for (;;) {
         Sleep(10);
@@ -371,6 +449,23 @@ DWORD WINAPI ModThread(void* param) {
                 reinterpret_cast<void*>(ride.mount), ride.forwardFromMount ? "mount" : "rider");
             wasMounted = ride.mounted;
             wasFromMount = ride.forwardFromMount;
+        }
+        if (ride.mount != classified) {
+            g_groundMount = 0;
+            classified = 0;
+            if (ride.mount) {
+                const std::string package = ReadPackageName(ride.mount);
+                if (!package.empty()) {
+                    classified = ride.mount;
+                    reportedUnreadable = false;
+                    const bool ground = IsGroundMountPackage(package);
+                    if (ground) g_groundMount = ride.mount;
+                    Log("mount package: %s (%s)", package.c_str(), ground ? "controls on" : "not a ground mount, mod inactive");
+                } else if (!reportedUnreadable) {
+                    reportedUnreadable = true;
+                    Log("mount package unreadable: mod inactive until it can be read");
+                }
+            }
         }
         for (int i = 0; i < 2; ++i) {
             const uintptr_t actor = g_samples[i].actor.load();
