@@ -141,10 +141,17 @@ Build and test one stage at a time. Each stage must be tested in game before the
 - **Status:** `src/HorseSteer` is the working mod; the "Minimal mod" section above is superseded, because the mod replaces the
   camera vectors rather than the stick. Forward steering and free look work at walk, trot and gallop, and S with A or D pivots.
 - **Next:**
-  1. Make S a hard brake that slows the horse faster than releasing W. Start from the chart's `key_brake` input and the game
-     key check at `exe+0x3B0150`, which is untraced.
-  2. Optionally, try `backward-walk-idea.md`.
-  3. Replace fixed addresses with signature scans, and test more mounts when the user has access to them.
+  1. Make S a brake while moving and a backward walk while stopped, as the tester asked. Start with two tests: the tester dashes
+     (`Key_Run` repeatedly) and presses Alt, with and without A or D, to see if `gallop_f_slip_end` is the stop they want; and the
+     one-branch experiment in `backward-walk-idea.md`, to see if the backward clips move the horse. Both need chart patches, and
+     their branch format is shared. See the `key_brake` finding in `discovery.md` for why the key check alone isn't enough.
+  2. Limit S handling to `CD_R0001_Horse`, because clearing backward input may block backsteps and backward walks on other mounts,
+     such as the wolf and elephant.
+  3. Before any public release, find which input hook causes the freeze after a won minigame, by testing each alone, then try moving
+     it. The tester accepts a remount until then.
+  4. Replace fixed addresses with signature scans, and test more mounts when the user has access to them.
+- **Chart decoding:** `scratch/analysis/chart_branches.py CDMW_SRC CHART_DIR` prints the horse chart's `key_brake` branches, the
+  branches into the slide and drift states, and its skill conditions, with conditions decoded.
 - **Steering tuning:** stage 4 passed in game, and the tester rated `kSteerRampMs`, `kTightSteerFactor` and `kWideSteerFactor`
   about right, so leave them as they are. To test a new build, turn `HorseSteer` off and on in DMM and apply, so that it's
   copied to `bin64`.

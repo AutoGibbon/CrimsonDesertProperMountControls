@@ -206,3 +206,13 @@ Leave `HorseSteer` enabled until the logs have been read.
 - Any crash or freeze?
 - Is 0.3 s too slow, too quick, or about right? seems juust about right.
 - Notes:
+
+# Taming minigame results
+
+Tested on the build that pauses the mod during the minigame.
+
+| Check | What happened |
+| --- | --- |
+| Minigame controls | Normal, with no delay noticed |
+| Riding off after a win | The horse wouldn't move until a dismount and remount. Accepted as a known issue |
+| Riding off after a win, `HorseSteer` disabled | Normal |

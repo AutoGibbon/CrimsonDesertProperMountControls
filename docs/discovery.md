@@ -36,7 +36,8 @@ against the mount's facing, so the camera stays free. Test status is in `docs/ho
 | --- | --- |
 | Forward, steering and free look | Working at walk, trot and gallop, tested in game |
 | Reversing | Not reachable through input: `walk_b_stt`, `ing` and `end` have no branch in from any other state. Backward stick input is cleared at `exe+0xB6C5A6` instead |
-| Hard brake on S | Not started. The horse chart has a `key_brake` input, so S may be able to trigger it by answering a game key check at `exe+0x3B0150`; this is untraced |
+| Hard brake on S | Not started. Answering `key_brake` alone won't stop harder: see the `key_brake` finding below. It needs chart branches from the normal gaits into stopping clips, or slowing the horse directly |
+| Taming minigame | Working in game: the mod pauses while the rodeo UI's frame slot is being called. Known issue: the horse ignores input after a win until the rider dismounts and remounts |
 | Mount check | The action package name at `[[[[mount+0x68]+0x40]+0x28]+0x18]+0x48` must be in the land-mount list in `HorseSteer.cpp`. Working on the horse in game; other mounts are untested and use their own charts. `CD_M0003_CucuBird` is included; it has gliding states that are untested |
 | Game camera follow and lookahead on | Not tested; the game hit a GPU reset when they were turned back on |
 
@@ -141,6 +142,23 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
   about 1 m/s or less for as long as the keys are held. Pressing either key first sets off normally, including A or D first, so a
   steep angle alone isn't the cause. The chart cause is untraced. The steering ramp prevents it: all 7 simultaneous starts logged in
   stage 4 reached walking speed within 2 s.
+- **`key_brake`:** bound to Alt, mouse X2 and gamepad B, in the same `CharacterAction` group that on-foot charts read, so S can't be
+  added to it in `inputmap.xml`. The game's text describes it as "Drift ... while dashing". Most horse uses are `OR T10 key_brake`,
+  and `T10` is probably "no stick input", which fits the tester finding that Alt at normal gaits feels the same as releasing W. The
+  slide stop, `gallop_f_slip_end`, is only entered from the drift-end and `faststart` clips and two special gallop states. Drift
+  start needs `SKILL_USABLE(12007)`. These skill IDs have not been matched to names or unlock rules.
+- **Key check:** `exe+0x3B0150` reads a key hash from its condition at `+8`, but the live function starts with a jump to a
+  non-module address (`0x13FFD003C` in the logged runs), so something else hooks it at runtime. Combat Evolved's log says it only
+  calls this function. Which return value means pressed is unconfirmed.
+- **Taming minigame:** it needs input pointing at the mount's tail, and it reads the movement data the mod edits: holding S wins it
+  with ease while backward input reaches the game. The package name can't separate wild horses from tamed ones.
+- **Rodeo signal:** slot 47 of `UIGamePlayControlRootMiniGameRodeo`'s vtable (`exe+0x5A6CBF8`) ran about 70 times a second during
+  each minigame logged, and was silent otherwise. Slot 17 fired at each open and slot 19 at each close. Slot 47 starts 0.3–0.65 s after
+  mounting.
+- **Freeze after a win:** the horse ignores input after a won minigame until a remount. It happens with both input hooks installed,
+  even when they write nothing and without the rodeo stub, and doesn't happen with the hooks left out or `HorseSteer` disabled. Which
+  hook causes it, and how, is unknown. No branch in the exe lands inside either hook's patched bytes. Logs are in
+  `scratch/probe-runs/` (`f5-off-win`, `no-stub-win`, `no-hooks-win`).
 - **Probe freeze (13:57):** Windows logged it as an application hang (`AppHangB1`), not a crash.
 
 ### From other projects, not yet checked on this install

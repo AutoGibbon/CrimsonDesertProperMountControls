@@ -1,7 +1,7 @@
 // Horse-relative riding controls: on ground mounts, replaces the camera direction vectors in
 // ClientInputActorComponent's per-frame update with the mount's, so move input is resolved against the mount's facing.
 // Also widens and ramps in forward steering angles, and removes backward input, which leaves S with a steering input as
-// a pivot.
+// a pivot. All of this stops while the taming minigame runs, because it needs the game's own input directions.
 //
 // F5        toggle the mod
 // Shift+F5  flip the forward direction
@@ -36,6 +36,15 @@ constexpr uint8_t kHookSiteBytes[] = {0x49, 0x8B, 0x40, 0x20, 0x48, 0x8B, 0x88, 
 // In the same update, right before it reads the raw stick from +0x48.
 constexpr uintptr_t kStickSite = 0xB6C5A6;
 constexpr uint8_t kStickSiteBytes[] = {0x48, 0x8D, 0x77, 0x50, 0x48, 0x8B, 0x47, 0x48};
+// The chart's key condition check, which reads the key's hash from its condition.
+constexpr uintptr_t kKeyCheck = 0x3B0150;
+constexpr uint8_t kKeyCheckBytes[] = {0x48, 0x83, 0xEC, 0x28, 0x48, 0x8B, 0x02, 0x8B, 0x50, 0x08};
+// UIGamePlayControlRootMiniGameRodeo's vtable, its first entry, which confirms the address, and the slot the game calls
+// every frame while the minigame is open and at no other time.
+constexpr uintptr_t kVtRodeoUi = 0x5A6CBF8;
+constexpr uintptr_t kRodeoUiSlot0 = 0x11EF6B0;
+constexpr size_t kRodeoUiFrameSlot = 47;
+constexpr ULONGLONG kRodeoTimeoutMs = 250;
 
 constexpr uint32_t kInput_Actor = 0x08;
 constexpr uint32_t kInput_Stick = 0x38;
@@ -96,6 +105,7 @@ std::atomic<uintptr_t> g_groundMount{0};
 std::atomic<float> g_mountSpeed{0};
 std::atomic<int> g_steerSide{0};
 std::atomic<ULONGLONG> g_steerStart{0};
+volatile uint64_t* g_rodeoCalls = nullptr;
 
 void Log(const char* fmt, ...) {
     if (!g_log) return;
@@ -236,8 +246,19 @@ bool IsGroundMountPackage(const std::string& name) {
     return false;
 }
 
+// Return whether the taming minigame's UI was updated within kRodeoTimeoutMs.
+bool RodeoActive() {
+    static std::atomic<uint64_t> lastCalls{0};
+    static std::atomic<ULONGLONG> lastChange{0};
+    if (!g_rodeoCalls) return false;
+    const uint64_t calls = *g_rodeoCalls;
+    const ULONGLONG now = GetTickCount64();
+    if (calls != lastCalls.exchange(calls)) lastChange = now;
+    return now - lastChange.load() < kRodeoTimeoutMs;
+}
+
 bool RidingGroundMount(const Ride& ride) {
-    return g_enabled.load() && ride.mounted && ride.mount != 0 && ride.mount == g_groundMount.load();
+    return g_enabled.load() && ride.mounted && ride.mount != 0 && ride.mount == g_groundMount.load() && !RodeoActive();
 }
 
 // Return how far steering has ramped in, from 0 to 1, restarting when stickX starts steering or changes direction.
@@ -323,6 +344,59 @@ void OnStickRead(SafetyHookContext& ctx) {
     SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
 }
 
+// Replace the rodeo UI's per-frame vtable slot with a stub that counts the call and jumps to the original, leaving every
+// register except the flags untouched, so that RodeoActive can tell when the minigame is open.
+void InstallRodeoSwitch() {
+    const auto vtable = reinterpret_cast<uintptr_t*>(g_base + kVtRodeoUi);
+    if (vtable[0] != g_base + kRodeoUiSlot0) {
+        Log("rodeo switch: vtable differs, not installed");
+        return;
+    }
+    auto* stub = static_cast<uint8_t*>(VirtualAlloc(nullptr, 32, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!stub) {
+        Log("rodeo switch: stub allocation failed");
+        return;
+    }
+    // lock inc qword ptr [rip+8]; jmp qword ptr [rip+10]; the counter is at +16 and the original address at +24.
+    const uint8_t code[] = {0xF0, 0x48, 0xFF, 0x05, 8, 0, 0, 0, 0xFF, 0x25, 10, 0, 0, 0};
+    memcpy(stub, code, sizeof code);
+    memcpy(stub + 24, &vtable[kRodeoUiFrameSlot], sizeof(uintptr_t));
+    FlushInstructionCache(GetCurrentProcess(), stub, 32);
+    DWORD oldProtect = 0;
+    if (!VirtualProtect(&vtable[kRodeoUiFrameSlot], sizeof(uintptr_t), PAGE_READWRITE, &oldProtect)) {
+        Log("rodeo switch: vtable protection failed");
+        return;
+    }
+    g_rodeoCalls = reinterpret_cast<volatile uint64_t*>(stub + 16);
+    vtable[kRodeoUiFrameSlot] = reinterpret_cast<uintptr_t>(stub);
+    VirtualProtect(&vtable[kRodeoUiFrameSlot], sizeof(uintptr_t), oldProtect, &oldProtect);
+    Log("rodeo switch installed");
+}
+
+// Log the key check's first bytes if they differ from the file's, which means something patched it at runtime.
+void LogKeyCheckBytes() {
+    const auto* live = reinterpret_cast<const uint8_t*>(g_base + kKeyCheck);
+    if (memcmp(live, kKeyCheckBytes, sizeof kKeyCheckBytes) == 0) {
+        Log("key check bytes match the file");
+        return;
+    }
+    char text[3 * 32 + 1] = {};
+    for (int i = 0; i < 32; ++i) snprintf(text + i * 3, 4, "%02X ", live[i]);
+    Log("key check bytes differ: %s", text);
+    if (live[0] == 0xE9) {
+        int32_t offset = 0;
+        memcpy(&offset, live + 1, sizeof offset);
+        const uintptr_t target = g_base + kKeyCheck + 5 + offset;
+        HMODULE owner = nullptr;
+        wchar_t path[MAX_PATH] = L"unknown";
+        if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               reinterpret_cast<LPCWSTR>(target), &owner)) {
+            GetModuleFileNameW(owner, path, MAX_PATH);
+        }
+        Log("key check jumps to %p in %ls", reinterpret_cast<void*>(target), path);
+    }
+}
+
 bool KeyDown(int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
 
 bool GameFocused() {
@@ -404,7 +478,7 @@ bool InstallHook() {
         Log("hook site bytes differ, possibly another mod's hook: hooks not installed");
         return false;
     }
-    auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + kHookSite), OnInputUpdate);
+    auto hook =safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + kHookSite), OnInputUpdate);
     auto stickHook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + kStickSite), OnStickRead);
     if (!hook || !stickHook) {
         Log("hooks failed to install");
@@ -414,6 +488,8 @@ bool InstallHook() {
     g_stickHook = std::move(*stickHook);
     Log("hooks installed at exe+0x%llX and exe+0x%llX", static_cast<unsigned long long>(kHookSite),
         static_cast<unsigned long long>(kStickSite));
+    InstallRodeoSwitch();
+    LogKeyCheckBytes();
     return true;
 }
 
@@ -433,7 +509,7 @@ DWORD WINAPI ModThread(void* param) {
     Sleep(20000);
     if (!InstallHook()) return 0;
 
-    bool f5Was = false, wasMounted = false, wasFromMount = false;
+    bool f5Was = false, wasMounted = false, wasFromMount = false, wasRodeo = false;
     uintptr_t seen[2] = {};
     uintptr_t classified = 0;
     bool reportedUnreadable = false;
@@ -457,6 +533,11 @@ DWORD WINAPI ModThread(void* param) {
         const ULONGLONG now = GetTickCount64();
         if (now - lastTelemetry < 100) continue;
         lastTelemetry = now;
+        const bool rodeo = RodeoActive();
+        if (rodeo != wasRodeo) {
+            Log("rodeo %s", rodeo ? "started: mod paused" : "ended");
+            wasRodeo = rodeo;
+        }
         const Ride ride = ResolveRide();
         if (ride.mounted != wasMounted || ride.forwardFromMount != wasFromMount) {
             Log("mounted=%d key=0x%08X mount_actor=%p facing from %s", ride.mounted ? 1 : 0, ride.mountKey,

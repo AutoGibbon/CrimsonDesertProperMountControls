@@ -1,6 +1,7 @@
 # Idea: horse backward walk
 
-Not started. S currently brakes. RDR2 also backs up, and this would add that through a chart patch paired with the ASI.
+Not started. S currently coasts, and pivots with A or D. RDR2 also backs up, and this would add that through a chart patch paired with
+the ASI.
 The ASI is still needed either way, because horse-relative movement is outside the chart data.
 
 ## Findings
@@ -26,9 +27,12 @@ Field names are inferred from the data. `scratch/cdmw-src/cdmw/core/action_chart
 - **Node:** `+0x18` is the state hash. `+0xE4` (u16) and `+0xE8` (u16) are the first index and count in the 32-byte branch
   records.
 - **Branch record (32 bytes):** `+0x0C` (u16) is the index into `branchInstanceArray`.
-- **Branch (0x38 bytes):** `+0x14` is the target state hash. `+0x24` (u16) looks like an index into the condition indices.
+- **Branch (0x38 bytes):** `+0x14` is the target state hash. `+0x24` and `+0x26` (u16) each start a condition list in the condition
+  indices, with lengths in the bytes at `+0x2A` and `+0x2B`. Key checks are in the second list.
+- **Condition list:** each index is a dword offset into the condition bytecode, and tokens read as prefix expressions: `0x287` AND,
+  `0x288` OR, `0x289` NOT.
 - **Condition:** type `0xEA` looks like a key check, with a name table index and a hash after it. Combat Evolved's log also
-  calls type 234 its key condition.
+  calls type 234 its key condition, and type 238 (`0xEE`) skill usable, which takes a skill ID.
 - **Adding branches:** point a node's record range at a copy appended to the end of the table, so no other index moves. This
   is untested.
 
