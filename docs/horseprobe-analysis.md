@@ -10,7 +10,8 @@ findings so far are in [discovery.md](discovery.md).
   results.
 - `bin64\HorseProbe.csv`: telemetry at about 10 rows per second, paused during scan passes.
 
-The probe overwrites both files on each launch, so copy them to `scratch/` before another run.
+The probe overwrites both files on each launch, and disabling it in DMM deletes them, so copy them to `scratch/` before
+either.
 
 ## Telemetry columns
 
@@ -137,14 +138,34 @@ Build and test one stage at a time. Each stage must be tested in game before the
 
 ## Resuming work
 
+- **Status:** the probe test is done; results are in `discovery.md`. Work has moved to `src/HorseSteer`, which uses a simpler
+  hook than the "Minimal mod" formula above: it replaces the camera vectors rather than the stick. Next is
+  `horsesteer-test.md`, then the stages above from stage 2. Build it the same way as the probe, from `src/HorseSteer`.
+- **HorseSteer logs:** `bin64\HorseSteer.log` records the hook install, mount changes and which actor each input slot
+  belongs to. `bin64\HorseSteer.csv` is written about 10 times a second while mounted. Slot `i0` is the rider's input
+  component and `i1` is any other. With W held and the mod working, `i0_relative` or `i1_relative` should be near 0 and
+  `travel_yaw` should stay steady while the camera yaw changes. A value near ±180 means the forward sign is wrong.
+- **Static analysis:** `tools/disasm.py` reads the on-disk exe, and addresses in `.sxdata` disassemble cleanly there, so
+  Ghidra has not been needed.
+- **Not installed:** Cheat Engine, Ghidra and x64dbg. Ghidra 12.2 needs Java 25 and this machine has JRE 17, so add a
+  portable JDK under `scratch/` if it's needed. Installing Cheat Engine needs the user's admin prompt:
+  `choco install cheatengine -y`.
+- **CDMW:** the tools use its source as a library. `scratch/cdmw-release/CDMW.exe` is downloaded but has never been run.
 - **Requirements:** in `discovery.md`. Free look is mandatory, which rules out camera-only fixes.
 - **Mods:** other mods stay enabled during tests unless the tester agrees otherwise.
 - **Updates:** the game can update at any launch, and Steam's update setting doesn't prevent it. The current exe is saved
   at `scratch/exe-baseline/CrimsonDesert_3479.exe`.
-- **Repo state:** check `git log` and `git status`; at the time of writing, nothing was committed.
-- **Git-ignored local data:** `scratch/` holds the CDMW checkout and Python venv, and is safe to rebuild:
-  - `git clone https://github.com/Ratty123/CDMW-Full scratch/cdmw-src`
-  - Create the venv with Python 3.11+ and install `lz4 cryptography Pillow numpy`.
+- **Repo state:** check `git log` and `git status`.
+- **Git-ignored local data:** `scratch/` is about 1 GB, and the agent manages it. Don't commit it or `build/`.
+  - `exe-baseline/`: can't be recreated after a game update, so don't delete it.
+  - `venv/`: Python 3.12 with `lz4 cryptography Pillow numpy capstone`. Run the tools with
+    `scratch/venv/Scripts/python`.
+  - `probe-runs/`: saved probe logs. Copy each test's logs here before they can be deleted or overwritten.
+  - `caballo.md`: CrimsonDesertCoop's horse research (`docs/research/caballo-coop.md`), written for build 2976.
+  - `cdmw-src/`: CDMW source at commit `585ac51`, with no `.git`. To recreate it, run
+    `git clone https://github.com/Ratty123/CDMW-Full scratch/cdmw-src`.
+  - `out/`: archive index (`index.tsv`), all action charts (`charts/`), English text (`loc_eng.json`) and other extracts.
+    These can be regenerated with `tools/`.
 - **Build and deploy the probe:**
 
   ```bash

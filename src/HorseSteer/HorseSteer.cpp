@@ -1,0 +1,396 @@
+// Horse-relative riding controls: while mounted, replaces the camera direction vectors in
+// ClientInputActorComponent's per-frame update with the mount's, so move input is resolved against the mount's facing.
+//
+// F5        toggle the mod
+// Shift+F5  flip the forward direction
+
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
+#include <atomic>
+#include <cmath>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <cwchar>
+#include <string>
+
+#include "safetyhook.hpp"
+
+namespace {
+
+// Build 1.0.0.3479.
+constexpr uint32_t kPeTimestamp = 0x6AE6E3E8;
+constexpr uintptr_t kWorldSystemSlot = 0x71B6C50;
+constexpr uintptr_t kChunkOrigin = 0x71A2EB0;
+constexpr uintptr_t kVtActorManager = 0x593ECF0;
+constexpr uintptr_t kVtVehicleComponent = 0x593E9D8;
+// Inside ClientInputActorComponent's update (exe+0xB6C3F0), right after it copies the camera vectors.
+constexpr uintptr_t kHookSite = 0xB6C4A6;
+constexpr uint8_t kHookSiteBytes[] = {0x49, 0x8B, 0x40, 0x20, 0x48, 0x8B, 0x88, 0x30, 0x12, 0x00, 0x00};
+
+constexpr uint32_t kInput_Actor = 0x08;
+constexpr uint32_t kInput_Stick = 0x38;
+constexpr uint32_t kInput_MoveAngle = 0x88;
+constexpr uint32_t kInput_MoveAngleRelative = 0x8C;
+constexpr uint32_t kInput_CameraForward = 0x154;
+constexpr uint32_t kInput_CameraRight = 0x160;
+
+constexpr float kMissing = -9999.0f;
+constexpr float kRadToDeg = 57.29578f;
+
+struct Vec3 {
+    float x, y, z;
+};
+
+struct Ride {
+    uintptr_t rider = 0;
+    uintptr_t mount = 0;
+    uint32_t mountKey = 0;
+    bool mounted = false;
+    bool haveForward = false;
+    bool forwardFromMount = false;
+    Vec3 axisZ{};
+};
+
+// Latest values from one input component, for logging.
+struct InputSample {
+    std::atomic<uintptr_t> actor{0};
+    std::atomic<float> stickX{0}, stickY{0}, angle{0}, relative{0}, cameraYaw{kMissing}, targetYaw{kMissing};
+    std::atomic<bool> applied{false};
+};
+
+FILE* g_log = nullptr;
+FILE* g_csv = nullptr;
+uintptr_t g_base = 0;
+std::atomic<bool> g_enabled{true};
+std::atomic<bool> g_flip{false};
+InputSample g_samples[2];
+SafetyHookMid g_hook;
+
+void Log(const char* fmt, ...) {
+    if (!g_log) return;
+    va_list args;
+    va_start(args, fmt);
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    fprintf(g_log, "[%02d:%02d:%02d.%03d] ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+    vfprintf(g_log, fmt, args);
+    fputc('\n', g_log);
+    fflush(g_log);
+    va_end(args);
+}
+
+bool SafeRead(uintptr_t addr, void* out, size_t size) {
+    __try {
+        memcpy(out, reinterpret_cast<const void*>(addr), size);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+bool SafeWrite(uintptr_t addr, const void* in, size_t size) {
+    __try {
+        memcpy(reinterpret_cast<void*>(addr), in, size);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+template <typename T>
+bool Read(uintptr_t addr, T& out) {
+    return SafeRead(addr, &out, sizeof(T));
+}
+
+uintptr_t ReadPtr(uintptr_t addr) {
+    uintptr_t p = 0;
+    if (!Read(addr, p) || p < 0x10000 || p >= 0x7FFFFFFFFFFF) return 0;
+    return p;
+}
+
+bool Finite(const Vec3& v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
+
+float YawDeg(float x, float z) { return std::atan2(x, z) * kRadToDeg; }
+
+bool HasVtable(uintptr_t obj, uintptr_t rva) {
+    uintptr_t vt = 0;
+    return Read(obj, vt) && vt == g_base + rva;
+}
+
+// Return the actor for `key` from the ClientActorManager hash table, or 0.
+uintptr_t FindActor(uintptr_t manager, uint32_t key) {
+    const uintptr_t table = ReadPtr(manager + 0x08);
+    if (!table) return 0;
+    uint32_t buckets = 0;
+    if (!Read(table + 0x88, buckets) || buckets == 0 || buckets > (1u << 24)) return 0;
+    const uintptr_t bucketBase = ReadPtr(table + 0x98);
+    const uintptr_t nodes = ReadPtr(table + 0xA0);
+    if (!bucketBase || !nodes) return 0;
+    const uintptr_t bucket = bucketBase + static_cast<uintptr_t>(key % buckets) * 0x100;
+    uint32_t count = 0;
+    if (!Read(bucket, count)) return 0;
+    for (uint32_t i = 0; i < count && i < 31; ++i) {
+        uint32_t k = 0, idx = 0;
+        if (!Read(bucket + 8 + i * 8, k) || k != key) continue;
+        if (!Read(bucket + 0xC + i * 8, idx)) return 0;
+        const uintptr_t node = ReadPtr(nodes + static_cast<uintptr_t>(idx) * 8);
+        return node ? ReadPtr(node + 0x08) : 0;
+    }
+    return 0;
+}
+
+// Read the Z axis and position of an actor's physics object.
+bool ReadPhysics(uintptr_t actor, Vec3& axisZ, Vec3* position = nullptr) {
+    const uintptr_t components = ReadPtr(actor + 0x68);
+    const uintptr_t control = components ? ReadPtr(components + 0x40) : 0;
+    const uintptr_t inner = control ? ReadPtr(control + 0x140) : 0;
+    const uintptr_t physics = inner ? ReadPtr(inner + 0x2C0) : 0;
+    if (!physics || !Read(physics + 0x80, axisZ) || !Finite(axisZ)) return false;
+    if (position && (!Read(physics + 0x90, *position) || !Finite(*position))) return false;
+    return true;
+}
+
+// Return an actor's yaw from the TransformSync rotation the game itself uses in the update, or kMissing.
+float ReadSyncYaw(uintptr_t actor) {
+    const uintptr_t components = ReadPtr(actor + 0x68);
+    const uintptr_t sync = components ? ReadPtr(components + 0x1A0) : 0;
+    float q[4];
+    if (!sync || !SafeRead(sync + 0xFC, q, sizeof q)) return kMissing;
+    const float n = q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
+    if (!std::isfinite(n) || std::fabs(n - 1.0f) > 0.02f) return kMissing;
+    return YawDeg(2 * (q[0] * q[2] + q[3] * q[1]), 1 - 2 * (q[0] * q[0] + q[1] * q[1]));
+}
+
+// Resolve the controlled actor, its mount through the vehicle component link, and the mount's facing.
+Ride ResolveRide() {
+    Ride ride;
+    const uintptr_t world = ReadPtr(g_base + kWorldSystemSlot);
+    const uintptr_t manager = world ? ReadPtr(world + 0x30) : 0;
+    if (!manager || !HasVtable(manager, kVtActorManager)) return ride;
+    ride.rider = ReadPtr(manager + 0x50);
+    if (!ride.rider) return ride;
+    const uintptr_t components = ReadPtr(ride.rider + 0x68);
+    const uintptr_t vehicle = components ? ReadPtr(components + 0x48) : 0;
+    if (!vehicle || !HasVtable(vehicle, kVtVehicleComponent)) return ride;
+    const uintptr_t link = ReadPtr(vehicle + 0x18);
+    int8_t seat = -1;
+    if (!link || !Read(link + 0x10, ride.mountKey) || ride.mountKey == 0) return ride;
+    if (!Read(link + 0x14, seat) || seat == -1) return ride;
+    ride.mounted = true;
+    ride.mount = FindActor(manager, ride.mountKey);
+    if (ride.mount && ReadPhysics(ride.mount, ride.axisZ)) {
+        ride.haveForward = true;
+        ride.forwardFromMount = true;
+    } else if (ReadPhysics(ride.rider, ride.axisZ)) {
+        ride.haveForward = true;
+    }
+    return ride;
+}
+
+// Replace the component's camera forward and right vectors with ones aligned to the mount, keeping their handedness.
+bool ApplyMountDirection(uintptr_t input, const Ride& ride, InputSample& sample) {
+    Vec3 forward, right;
+    if (!Read(input + kInput_CameraForward, forward) || !Read(input + kInput_CameraRight, right)) return false;
+    if (!Finite(forward) || !Finite(right)) return false;
+    sample.cameraYaw = YawDeg(forward.x, forward.z);
+
+    // The game's move angle orients the actor's +Z against the resolved direction, so forward is minus the Z axis.
+    const float sign = g_flip.load() ? 1.0f : -1.0f;
+    const float len = std::hypot(ride.axisZ.x, ride.axisZ.z);
+    if (len < 0.001f) return false;
+    const float tx = sign * ride.axisZ.x / len, tz = sign * ride.axisZ.z / len;
+
+    static float handedness = 1.0f;
+    const float cross = forward.x * right.z - forward.z * right.x;
+    if (std::fabs(cross) > 0.01f) handedness = cross > 0 ? 1.0f : -1.0f;
+    const float rightLen = std::hypot(right.x, right.z);
+
+    const Vec3 newForward{tx, 0.0f, tz};
+    const Vec3 newRight{-tz * handedness * rightLen, right.y, tx * handedness * rightLen};
+    sample.targetYaw = YawDeg(tx, tz);
+    return SafeWrite(input + kInput_CameraForward, &newForward, sizeof newForward) &&
+           SafeWrite(input + kInput_CameraRight, &newRight, sizeof newRight);
+}
+
+void OnInputUpdate(SafetyHookContext& ctx) {
+    const uintptr_t input = ctx.rdi;
+    uintptr_t actor = 0;
+    Read(input + kInput_Actor, actor);
+    const Ride ride = ResolveRide();
+
+    InputSample& sample = g_samples[actor != 0 && actor == ride.rider ? 0 : 1];
+    sample.actor = actor;
+    float stick[2] = {}, angle = 0, relative = 0;
+    SafeRead(input + kInput_Stick, stick, sizeof stick);
+    Read(input + kInput_MoveAngle, angle);
+    Read(input + kInput_MoveAngleRelative, relative);
+    sample.stickX = stick[0];
+    sample.stickY = stick[1];
+    sample.angle = angle * kRadToDeg;
+    sample.relative = relative * kRadToDeg;
+
+    bool applied = false;
+    if (g_enabled.load() && ride.mounted && ride.haveForward) applied = ApplyMountDirection(input, ride, sample);
+    sample.applied = applied;
+}
+
+bool KeyDown(int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
+
+bool GameFocused() {
+    DWORD pid = 0;
+    GetWindowThreadProcessId(GetForegroundWindow(), &pid);
+    return pid == GetCurrentProcessId();
+}
+
+void WriteTelemetry(const Ride& ride) {
+    static Vec3 lastPos{};
+    static ULONGLONG lastTick = 0, lastFlush = 0;
+    static size_t rows = 0;
+    if (!g_csv || rows > 500000) return;
+
+    Vec3 origin{}, riderAxis{}, riderPos{}, mountAxis{};
+    Read(g_base + kChunkOrigin, origin);
+    const bool haveRider = ride.rider && ReadPhysics(ride.rider, riderAxis, &riderPos);
+    const bool haveMount = ride.mount && ReadPhysics(ride.mount, mountAxis);
+
+    const ULONGLONG now = GetTickCount64();
+    float speed = kMissing, travelYaw = kMissing;
+    const Vec3 world{riderPos.x + origin.x, riderPos.y + origin.y, riderPos.z + origin.z};
+    if (haveRider && lastTick != 0 && now > lastTick) {
+        const float dt = static_cast<float>(now - lastTick) / 1000.0f;
+        const float dx = world.x - lastPos.x, dz = world.z - lastPos.z;
+        speed = std::hypot(dx, dz) / dt;
+        if (speed > 0.1f) travelYaw = YawDeg(dx, dz);
+    }
+    if (haveRider) {
+        lastPos = world;
+        lastTick = now;
+    }
+
+    fprintf(g_csv, "%llu,%d,%d,%d,%d,%d,%d,%d,%08X,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", now, KeyDown('W') ? 1 : 0,
+            KeyDown('A') ? 1 : 0, KeyDown('S') ? 1 : 0, KeyDown('D') ? 1 : 0, g_enabled.load() ? 1 : 0,
+            g_flip.load() ? 1 : 0, ride.mounted ? 1 : 0, ride.mountKey, ride.forwardFromMount ? 1 : 0,
+            haveRider ? YawDeg(riderAxis.x, riderAxis.z) : kMissing, haveMount ? YawDeg(mountAxis.x, mountAxis.z) : kMissing,
+            ride.rider ? ReadSyncYaw(ride.rider) : kMissing, ride.mount ? ReadSyncYaw(ride.mount) : kMissing, speed,
+            travelYaw);
+    for (const InputSample& s : g_samples) {
+        fprintf(g_csv, ",%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", s.applied.load() ? 1 : 0, s.stickX.load(), s.stickY.load(),
+                s.angle.load(), s.relative.load(), s.cameraYaw.load(), s.targetYaw.load());
+    }
+    fputc('\n', g_csv);
+    ++rows;
+    if (now - lastFlush > 1000) {
+        fflush(g_csv);
+        lastFlush = now;
+    }
+}
+
+// Return whether this process is the game, because the ASI loader also loads this module into crashpad_handler.exe.
+bool IsGameProcess() {
+    wchar_t path[MAX_PATH] = {};
+    GetModuleFileNameW(nullptr, path, MAX_PATH);
+    const wchar_t* slash = wcsrchr(path, L'\\');
+    return _wcsicmp(slash ? slash + 1 : path, L"CrimsonDesert.exe") == 0;
+}
+
+std::wstring ModuleDir(HMODULE module) {
+    wchar_t path[MAX_PATH] = {};
+    GetModuleFileNameW(module, path, MAX_PATH);
+    std::wstring dir(path);
+    const size_t slash = dir.find_last_of(L"\\/");
+    return slash == std::wstring::npos ? L"." : dir.substr(0, slash);
+}
+
+bool InstallHook() {
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(g_base);
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(g_base + dos->e_lfanew);
+    Log("loaded: base %p, PE timestamp 0x%08X", reinterpret_cast<void*>(g_base), nt->FileHeader.TimeDateStamp);
+    if (nt->FileHeader.TimeDateStamp != kPeTimestamp) {
+        Log("unsupported game build: hook not installed");
+        return false;
+    }
+    if (memcmp(reinterpret_cast<const void*>(g_base + kHookSite), kHookSiteBytes, sizeof kHookSiteBytes) != 0) {
+        Log("hook site bytes differ, possibly another mod's hook: hook not installed");
+        return false;
+    }
+    auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + kHookSite), OnInputUpdate);
+    if (!hook) {
+        Log("hook failed to install");
+        return false;
+    }
+    g_hook = std::move(*hook);
+    Log("hook installed at exe+0x%llX", static_cast<unsigned long long>(kHookSite));
+    return true;
+}
+
+DWORD WINAPI ModThread(void* param) {
+    const std::wstring dir = ModuleDir(static_cast<HMODULE>(param));
+    g_log = _wfsopen((dir + L"\\HorseSteer.log").c_str(), L"w", _SH_DENYNO);
+    g_csv = _wfsopen((dir + L"\\HorseSteer.csv").c_str(), L"w", _SH_DENYNO);
+    if (g_csv) {
+        fputs("tick_ms,w,a,s,d,enabled,flip,mounted,mount_key,forward_from_mount,rider_phys_yaw,mount_phys_yaw,"
+              "rider_sync_yaw,mount_sync_yaw,speed,travel_yaw,"
+              "i0_applied,i0_stick_x,i0_stick_y,i0_angle,i0_relative,i0_camera_yaw,i0_target_yaw,"
+              "i1_applied,i1_stick_x,i1_stick_y,i1_angle,i1_relative,i1_camera_yaw,i1_target_yaw\n", g_csv);
+    }
+    g_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+
+    // Other mods report crashes when hooking during the first seconds of launch.
+    Sleep(20000);
+    if (!InstallHook()) return 0;
+
+    bool f5Was = false, wasMounted = false, wasFromMount = false;
+    uintptr_t seen[2] = {};
+    ULONGLONG lastTelemetry = 0;
+    for (;;) {
+        Sleep(10);
+        const bool f5 = GameFocused() && KeyDown(VK_F5);
+        if (f5 && !f5Was) {
+            if (KeyDown(VK_SHIFT)) {
+                g_flip = !g_flip.load();
+                Log("flip %s", g_flip.load() ? "on" : "off");
+                Beep(600, 120);
+            } else {
+                g_enabled = !g_enabled.load();
+                Log("mod %s", g_enabled.load() ? "enabled" : "disabled");
+                Beep(g_enabled.load() ? 1200 : 400, 120);
+            }
+        }
+        f5Was = f5;
+
+        const ULONGLONG now = GetTickCount64();
+        if (now - lastTelemetry < 100) continue;
+        lastTelemetry = now;
+        const Ride ride = ResolveRide();
+        if (ride.mounted != wasMounted || ride.forwardFromMount != wasFromMount) {
+            Log("mounted=%d key=0x%08X mount_actor=%p facing from %s", ride.mounted ? 1 : 0, ride.mountKey,
+                reinterpret_cast<void*>(ride.mount), ride.forwardFromMount ? "mount" : "rider");
+            wasMounted = ride.mounted;
+            wasFromMount = ride.forwardFromMount;
+        }
+        for (int i = 0; i < 2; ++i) {
+            const uintptr_t actor = g_samples[i].actor.load();
+            if (actor != seen[i]) {
+                seen[i] = actor;
+                Log("input slot %d actor=%p (rider=%p mount=%p)", i, reinterpret_cast<void*>(actor),
+                    reinterpret_cast<void*>(ride.rider), reinterpret_cast<void*>(ride.mount));
+            }
+        }
+        if (ride.mounted) WriteTelemetry(ride);
+    }
+}
+
+}  // namespace
+
+BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
+    if (reason == DLL_PROCESS_ATTACH) {
+        DisableThreadLibraryCalls(module);
+        if (!IsGameProcess()) return TRUE;
+        if (HANDLE thread = CreateThread(nullptr, 0, ModThread, module, 0, nullptr)) CloseHandle(thread);
+    }
+    return TRUE;
+}

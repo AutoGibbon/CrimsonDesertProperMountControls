@@ -40,7 +40,8 @@ Hold only one movement key at a time, because the probe ignores the step until e
 This step could crash the game, so do it last and don't save afterwards. A crash still gives useful information.
 
 1. Press **F10**. It beeps once.
-2. Tap W, A, S and D until you hear two quick beeps, about 5 seconds later.
+2. Keep pressing and releasing W, A, S and D one at a time, repeating the cycle, until you hear two quick beeps about 5
+   seconds later.
 3. Repeat up to three more times. Each press checks the next four scan results.
 
 Skip this part if Part 2 did not finish.
@@ -50,7 +51,7 @@ If the game crashes or the results look wrong, don't disable mods yet. Report it
 ## Afterwards
 
 1. Close the game. This makes sure the logs are fully written.
-2. In DMM, disable `HorseProbe` and apply.
-3. Fill in the results file.
+2. Fill in the results file.
+3. Leave `HorseProbe` enabled until the logs have been read or copied.
 
-The probe writes `HorseProbe.log` and `HorseProbe.csv` to the game's `bin64` folder, and I read them from there. The next launch with the probe enabled overwrites both files, so tell me before running it again.
+The probe writes `HorseProbe.log` and `HorseProbe.csv` to the game's `bin64` folder. Disabling it in DMM deletes both files, and the next launch with it enabled overwrites them.

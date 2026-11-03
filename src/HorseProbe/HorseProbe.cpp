@@ -228,7 +228,10 @@ void WriteTelemetry() {
         fflush(g_csv);
         lastFlush = now;
     }
-    g_lastFailure.clear();
+    if (camYaw != kMissing && !g_lastFailure.empty()) {
+        Log("telemetry: camera readable again");
+        g_lastFailure.clear();
+    }
 }
 
 struct Candidate {
@@ -549,6 +552,14 @@ void FinishWatchIfDue() {
     Beep(800, 80);
 }
 
+// Return whether this process is the game, because the ASI loader also loads this module into crashpad_handler.exe.
+bool IsGameProcess() {
+    wchar_t path[MAX_PATH] = {};
+    GetModuleFileNameW(nullptr, path, MAX_PATH);
+    const wchar_t* slash = wcsrchr(path, L'\\');
+    return _wcsicmp(slash ? slash + 1 : path, L"CrimsonDesert.exe") == 0;
+}
+
 std::wstring ModuleDir(HMODULE module) {
     wchar_t path[MAX_PATH] = {};
     GetModuleFileNameW(module, path, MAX_PATH);
@@ -606,6 +617,7 @@ DWORD WINAPI ProbeThread(void* param) {
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(module);
+        if (!IsGameProcess()) return TRUE;
         if (HANDLE thread = CreateThread(nullptr, 0, ProbeThread, module, 0, nullptr)) CloseHandle(thread);
     }
     return TRUE;

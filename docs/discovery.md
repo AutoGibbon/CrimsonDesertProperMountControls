@@ -24,20 +24,20 @@ Replicate Red Dead Redemption 2's horse-relative controls, through a native ASI 
 
 ## Approach
 
-Each frame while riding, build the desired world direction from the horse's yaw and the WASD state, rotate it by minus
-the camera yaw, and write the result over the game's move input. The game's own camera-relative conversion then produces
-the horse-relative direction, so that conversion does not need to be found or patched.
+`src/HorseSteer` hooks `ClientInputActorComponent`'s per-frame update while the player is mounted, and replaces its copied
+camera forward and right vectors with ones aligned to the mount. The game's own angle calculation then resolves WASD
+against the mount's facing, so the camera stays free. Test status is in `docs/horsesteer-test.md`.
 
 | Unknown | Status |
 | --- | --- |
-| Camera yaw | Known layout: camera `+0x428` -> block, forward at block `+0x90`; address needs confirming on this build |
-| Horse yaw | Actor rotation exists in `MoveData`; live location not yet found |
-| Move input value | Not located; start from `ClientInputActorComponent` |
-| Mounted-on-horse check | Not located; start from `ClientVehicleActorComponent` |
-| Turning without moving | Not solved; may need a direct yaw write or the chart's turn behaviour |
+| Whether movement uses these angles | Hypothesis; stage 1 test |
+| Forward sign | Inferred from the angle code; stage 1 test, with Shift+F5 to flip it |
+| Horse-type mount check | Not done; the mod currently applies to anything ridden |
+| Turning without moving | Not solved; the horse does rotate in place before moving off when facing away from the input |
 | Reversing | `walk_b` clips exist in the horse chart; how to reach them from input is unknown |
+| Camera heading in telemetry | Not needed by the mod; `HorseSteer` logs it from the component's copied vector |
 
-Turning without moving is the highest risk, because the current movement may only rotate the horse while it travels.
+Turning without moving is the highest risk.
 
 The game setting and camera preset routes are ruled out: both work by keeping the camera behind the horse, which breaks
 free look.
@@ -70,6 +70,9 @@ Build: game exe 1.0.0.3479, PE timestamp `0x6AE6E3E8`.
 - **`MoveControlOptionType` (`Classic`/`Standard`):** this appears in the horse chart, but patch 1.02.00 describes the
   setting as sprint input behaviour, not steering.
 
+- **Existing mods:** the user searched Nexus and found none that do anything like this, and GitHub and web searches found
+  none either.
+
 ### Hypotheses
 
 - Camera-relative direction is computed in native code. This is inferred because the input map and chart data expose no
@@ -87,6 +90,29 @@ Build: game exe 1.0.0.3479, PE timestamp `0x6AE6E3E8`.
 - **Published vtables:** `ClientActorManager`, `ClientChildOnlyInGameActor` and
   `ClientCharacterControlActorComponent` resolve through RTTI at their published addresses in this exe. The published
   camera and physics vtable addresses do not, so `HorseProbe` checks the camera with its block sentinel instead.
+
+### From HorseProbe run 1 and disassembly
+
+Logs are in `scratch/probe-runs/run1/`.
+
+- **Update function:** `exe+0xB6C3F0` is slot 33 of the `ClientInputActorComponent` vtable (at `0x59504A0`, confirmed
+  through RTTI) and looks up the `MoveAnalog` input by name.
+- **Camera vectors:** it copies two vectors from `[[WorldSystem+0x18]+0x50]` into `+0x154` (forward) and `+0x160` (right).
+- **Angle calculation:** `exe+0xB6BD30` builds `stick.x * right + stick.y * horizontal forward` and returns
+  `atan2(-x, -z)`. The result goes in `+0x88`. A second call, with both vectors rotated by the inverse of the actor rotation
+  at TransformSync `+0xFC`, goes in `+0x8C`.
+- **Move input:** raw values are in an input state object, with the previous vector at `+0x38` and current at `+0x40`,
+  updated by `exe+0x30AE1C0`. Each input component holds its own copy at `+0x38` and `+0x48`. The scan found two such
+  components; what the second one belongs to is unknown.
+- **Mount link:** rider `[[actor+0x68]+0x48]` is the `ClientVehicleActorComponent` (vtable `0x593E9D8`). Its `[+0x18]+0x10`
+  is the mount key and `+0x14` the seat, as `RideOn::Enter` (`exe+0x74F270`) reads them.
+- **Headings:** with the camera held still, the rider's physics Z axis yaw swung about 90° left for A, 90° right for D
+  and 180° for S, and followed the horse while mounted.
+- **Failed telemetry:** the published camera slot's sentinel never matched, and horse key `0xB0100003` was not found.
+- **F10 freeze:** the game froze near the end of the write watch, during Esc and Alt+Tab. The cause is unknown, and a probe
+  cause is not ruled out.
+- **DMM:** a stale `bin64\dmm\manifest.tsv` pointing at a moved mods folder stops saves loading, with a missing
+  `decorationparam_cclite_female.xml` error. A full mount rebuilds it. Disabling an ASI in DMM deletes its logs.
 
 ### From other projects, not yet checked on this install
 
