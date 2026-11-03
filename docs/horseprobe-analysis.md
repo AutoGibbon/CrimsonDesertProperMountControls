@@ -141,13 +141,13 @@ Build and test one stage at a time. Each stage must be tested in game before the
 - **Status:** `src/HorseSteer` is the working mod; the "Minimal mod" section above is superseded, because the mod replaces the
   camera vectors rather than the stick. Forward steering and free look work at walk, trot and gallop, and S with A or D pivots.
 - **Next:**
-  1. Run Stage 3 in `horsesteer-test.md`, which is untested. The build is already in `DMM\mods`, including `CD_M0003_CucuBird`.
-     In DMM, turn `HorseSteer` off and on and apply, so that it's copied to `bin64`. Use the results to tune `kTightSteerFactor`
-     and `kWideSteerFactor`.
-  2. Make S a hard brake that slows the horse faster than releasing W. Start from the chart's `key_brake` input and the game
+  1. Make S a hard brake that slows the horse faster than releasing W. Start from the chart's `key_brake` input and the game
      key check at `exe+0x3B0150`, which is untraced.
-  3. Optionally, try `backward-walk-idea.md`.
-  4. Replace fixed addresses with signature scans, and test more mounts when the user has access to them.
+  2. Optionally, try `backward-walk-idea.md`.
+  3. Replace fixed addresses with signature scans, and test more mounts when the user has access to them.
+- **Steering tuning:** stage 4 passed in game, and the tester rated `kSteerRampMs`, `kTightSteerFactor` and `kWideSteerFactor`
+  about right, so leave them as they are. To test a new build, turn `HorseSteer` off and on in DMM and apply, so that it's
+  copied to `bin64`.
 - **Probe:** `HorseProbe` and its docs are finished diagnostics. Its source stays as a template for watches and scans. The mount
   scan was removed from `HorseSteer`; its output is in `scratch/probe-runs/steer5/` and the last version with it is not committed.
 - **HorseSteer deployment:** it needs a DMM off/on cycle after each new build. If a save won't load, check for a stale

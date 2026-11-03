@@ -37,7 +37,7 @@ against the mount's facing, so the camera stays free. Test status is in `docs/ho
 | Forward, steering and free look | Working at walk, trot and gallop, tested in game |
 | Reversing | Not reachable through input: `walk_b_stt`, `ing` and `end` have no branch in from any other state. Backward stick input is cleared at `exe+0xB6C5A6` instead |
 | Hard brake on S | Not started. The horse chart has a `key_brake` input, so S may be able to trigger it by answering a game key check at `exe+0x3B0150`; this is untraced |
-| Mount check | Awaiting test: the action package name at `[[[[mount+0x68]+0x40]+0x28]+0x18]+0x48` must be in the land-mount list in `HorseSteer.cpp`. Horse confirmed by scan; other mounts are untested and use their own charts. `CD_M0003_CucuBird` is included; it has gliding states that are untested |
+| Mount check | The action package name at `[[[[mount+0x68]+0x40]+0x28]+0x18]+0x48` must be in the land-mount list in `HorseSteer.cpp`. Working on the horse in game; other mounts are untested and use their own charts. `CD_M0003_CucuBird` is included; it has gliding states that are untested |
 | Game camera follow and lookahead on | Not tested; the game hit a GPU reset when they were turned back on |
 
 The game setting and camera preset routes are ruled out: both work by keeping the camera behind the horse, which breaks
@@ -133,6 +133,14 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
 - **Mount scan:** the horse's action package name is `CD_R0001_Horse`. Its appearance path is at a different chain from the protagonists'.
 - **S and steering rates:** S coasts from 6–9 m/s to a stop in about 2.5–4 s. W with A or D turns at 16–30°/s when setting off and
   37–42°/s at 6–10 m/s. A or D alone turns at 60–66°/s from standing and 83–90°/s at 4 m/s.
+- **Turn rate and stick angle (stage 3, `scratch/probe-runs/stage3/`):** the rate follows the angle and levels off near 60°/s. At
+  under 2.5 m/s, 45° gives about 31°/s and 80° about 57°/s. At 5 m/s and up, 45° gives about 43–50°/s and 55° about 53–59°/s. It also
+  follows below 45°: with `kSteerRampMs` at 300, at 2.5 m/s and up the rate is about 16°/s at 0.1 s, 36°/s at 0.2 s and 58°/s at
+  0.3 s after a steer press (stage 4, `scratch/probe-runs/stage4/`).
+- **Stuck pivot (stage 3):** at the 80° low-speed angle, pressing W and A or D at the same moment can leave the horse turning at
+  about 1 m/s or less for as long as the keys are held. Pressing either key first sets off normally, including A or D first, so a
+  steep angle alone isn't the cause. The chart cause is untraced. The steering ramp prevents it: all 7 simultaneous starts logged in
+  stage 4 reached walking speed within 2 s.
 - **Probe freeze (13:57):** Windows logged it as an application hang (`AppHangB1`), not a crash.
 
 ### From other projects, not yet checked on this install

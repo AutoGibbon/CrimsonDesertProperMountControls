@@ -1,6 +1,7 @@
 // Horse-relative riding controls: on ground mounts, replaces the camera direction vectors in
 // ClientInputActorComponent's per-frame update with the mount's, so move input is resolved against the mount's facing.
-// Also widens forward steering angles and removes backward input, which leaves S with a steering input as a pivot.
+// Also widens and ramps in forward steering angles, and removes backward input, which leaves S with a steering input as
+// a pivot.
 //
 // F5        toggle the mod
 // Shift+F5  flip the forward direction
@@ -57,6 +58,7 @@ constexpr float kWideSteerFactor = 55.0f / 45.0f;
 constexpr float kTightSteerSpeed = 2.5f;
 constexpr float kWideSteerSpeed = 5.0f;
 constexpr float kMaxSteerAngle = 85.0f / 57.29578f;
+constexpr float kSteerRampMs = 300.0f;
 
 constexpr float kMissing = -9999.0f;
 constexpr float kRadToDeg = 57.29578f;
@@ -92,6 +94,8 @@ SafetyHookMid g_hook;
 SafetyHookMid g_stickHook;
 std::atomic<uintptr_t> g_groundMount{0};
 std::atomic<float> g_mountSpeed{0};
+std::atomic<int> g_steerSide{0};
+std::atomic<ULONGLONG> g_steerStart{0};
 
 void Log(const char* fmt, ...) {
     if (!g_log) return;
@@ -236,12 +240,21 @@ bool RidingGroundMount(const Ride& ride) {
     return g_enabled.load() && ride.mounted && ride.mount != 0 && ride.mount == g_groundMount.load();
 }
 
-// Steer a forward stick vector further from straight ahead, by more at low speed, keeping its magnitude.
-void WidenSteering(float& x, float& y, float speed) {
+// Return how far steering has ramped in, from 0 to 1, restarting when stickX starts steering or changes direction.
+float SteerRamp(float stickX) {
+    const int side = stickX > 0.01f ? 1 : stickX < -0.01f ? -1 : 0;
+    const ULONGLONG now = GetTickCount64();
+    if (side != g_steerSide.exchange(side)) g_steerStart = now;
+    return std::min(static_cast<float>(now - g_steerStart.load()) / kSteerRampMs, 1.0f);
+}
+
+// Steer a forward stick vector further from straight ahead, by more at low speed, scaling the angle by ramp and keeping
+// its magnitude.
+void WidenSteering(float& x, float& y, float speed, float ramp) {
     const float t = std::clamp((speed - kTightSteerSpeed) / (kWideSteerSpeed - kTightSteerSpeed), 0.0f, 1.0f);
     const float factor = kTightSteerFactor + (kWideSteerFactor - kTightSteerFactor) * t;
     const float magnitude = std::hypot(x, y);
-    const float angle = std::min(std::atan2(std::fabs(x), y) * factor, kMaxSteerAngle);
+    const float angle = std::min(std::atan2(std::fabs(x), y) * factor, kMaxSteerAngle) * ramp;
     x = std::copysign(magnitude * std::sin(angle), x);
     y = magnitude * std::cos(angle);
 }
@@ -299,10 +312,11 @@ void OnStickRead(SafetyHookContext& ctx) {
     if (!RidingGroundMount(ResolveRide())) return;
     float stick[2];
     if (!SafeRead(ctx.rdi + kInput_RawStick, stick, sizeof stick)) return;
+    const float ramp = SteerRamp(stick[0]);
     if (stick[1] < 0.0f) {
         stick[1] = 0.0f;
     } else if (stick[1] > 0.0f && std::fabs(stick[0]) > 0.01f) {
-        WidenSteering(stick[0], stick[1], g_mountSpeed.load());
+        WidenSteering(stick[0], stick[1], g_mountSpeed.load(), ramp);
     } else {
         return;
     }
