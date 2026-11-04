@@ -187,6 +187,10 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
   hook causes it, and how, is unknown. No branch in the exe lands inside either hook's patched bytes. Logs are in
   `scratch/probe-runs/` (`f5-off-win`, `no-stub-win`, `no-hooks-win`).
 - **Probe freeze (13:57):** Windows logged it as an application hang (`AppHangB1`), not a crash.
+- **GPU crash while alt-tabbing (stage 5h, `scratch/probe-runs/stage5h/`):** a device removed error (`887A0006`) inside D3D12, with `renodx` and the Nvidia driver on the
+  stack and no mod code. DMM reported a GPU hang or driver loss. The tester then removed OptiScaler, and no crash dump has been written since, through stage 6.
+- **Stowing under a carriage:** riding the underside of a carriage counts as mounted, with key `0xB01004A7`. `ReadPackageName` returned unreadable text there, so the mod
+  stayed inactive, which is correct. That chain doesn't always lead to a name, which matters for carriage work.
 
 ### From other projects, not yet checked on this install
 

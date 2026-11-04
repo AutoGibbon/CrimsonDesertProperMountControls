@@ -145,11 +145,22 @@ Build and test one stage at a time. Each stage must be tested in game before the
   1. Get every legged ground mount working, which a public release requires. v0.0.1 is the working horse prototype, and how its backward walk works is in
      `backward-walk-idea.md`. For each mount in `kGroundMountPackages`, check the controls and whether that technique applies, and confirm the list has every legged
      mount. This also decides how S should work on them: clearing backward input may block backsteps and backward walks on mounts such as the wolf and elephant, so limit
-     that to the horse where the technique doesn't apply. The test save has only one basic mount, so start from game data.
-  2. Investigate carriages, which should get similar controls if possible. They aren't in `kGroundMountPackages` yet.
+     that to the horse where the technique doesn't apply. The test save has only one basic mount, and the tester is working out how to reach others, so wait for that
+     before continuing. Then work through these, starting with mounts whose data and mechanisms are closest to the horse's:
+     - Confirm each listed package's ride chart and blend files. `character/binary/motionblending/horse/` also has `donkey_move`, so check how donkeys and other horse
+       variants are covered.
+     - Look for backward clips in those blend files, and for a stop state like horse node 186, which holds while the mount keeps moving.
+     - Look for existing backward moves that clearing S would block.
+     - Sort the mounts into those where the horse method should work as it is, those needing changes, and those with no backward clips, then test in game.
+  2. Investigate carriages, which should get similar controls if possible. This is expected to be separate work, with its own round of probe logging and code execution
+     capture. They aren't in `kGroundMountPackages`, and the wagon has its own charts (`r0012_wagon_upper`, which reads `key_brake`, and `ride_carriage_lower` and
+     `ride_carriage_upper`). The first question is whether replacing the camera vectors applies to them.
   3. Before any public release, find which input hook causes the freeze after a won minigame, by testing each alone, then try moving
      it. The tester accepts a remount until then.
-  4. Replace fixed addresses with signature scans, and test more mounts when the user has access to them.
+  4. Replace fixed addresses with signature scans.
+  5. Update `g_mountSpeed` separately from `WriteTelemetry`, which stops updating it if the CSV can't open or passes 500,000 rows. Forward steering and the backward walk
+     both depend on it. Remove the CSV and other test logging for release.
+  6. Retest the taming minigame on the current build. Stage 6 didn't reach it, because wild horses take a long time to find.
 - **Chart decoding:** `scratch/analysis/chart_branches.py CDMW_SRC CHART_DIR` prints the horse chart's `key_brake` branches, the
   branches into the slide and drift states, and its skill conditions, with conditions decoded.
 - **Steering tuning:** stage 4 passed in game, and the tester rated `kSteerRampMs`, `kTightSteerFactor` and `kWideSteerFactor`
