@@ -148,7 +148,7 @@ Build and test one stage at a time. Each stage must be tested in game before the
      that to the horse where the technique doesn't apply. The test save has only one basic mount, and the tester is working out how to reach others, so wait for that
      before continuing. Then work through these, starting with mounts whose data and mechanisms are closest to the horse's:
      - Confirm each listed package's ride chart and blend files. `character/binary/motionblending/horse/` also has `donkey_move`, so check how donkeys and other horse
-       variants are covered.
+       variants are covered. `tools/mount_census.py` lists the vehicle types and `Riding_` characters, and `discovery.md` has the open questions on the ibex and donkeys.
      - Look for backward clips in those blend files, and for a stop state like horse node 186, which holds while the mount keeps moving.
      - Look for existing backward moves that clearing S would block.
      - Sort the mounts into those where the horse method should work as it is, those needing changes, and those with no backward clips, then test in game.
