@@ -60,11 +60,28 @@ Checked against this build's exe:
 - **Key query:** the signature has one match, `exe+0x30CAFD0`.
 - **Chart runtime path:** the code at `exe+0xBC6B38` reads `control = [[actor+0x68]+0x40]`, `index = byte [[control+0x30]+0x1B]` and `runtime = [[control+index*8+0x88]+0x18]`.
 
+Logged on the mount in `HorseSteer` in [stage 8](../horsesteer-tests/stage-8.md), and readable on both horses it rode:
+
+- **Chart state:** `state = [runtime+0x28]`. If byte `[state+0x7A]` is 1–32, `value` is the float at `[runtime+0x38] + word [state+0x78] + 0x18`. How a pointer maps to a node number is unknown, and both horses showed
+  the same pointers. `state` holds through a steady gait, with short excursions to other states. `value` is constant within a state and looks like a target speed, though what it means is unconfirmed. It's missing in idle states.
+  `value == 0` is not only braking, as Horse Tap Brake treats it: it also appears in the backward walk, and in states that held with W and a steering key down, at a standstill and at a gallop.
+
+  | Gait | `state`, last 5 hex digits | `value` | Median velocity, m/s |
+  | --- | --- | --- | --- |
+  | Walk | `3A56E` | 2.8 | 1.6 |
+  | Trot | `3B4A7` | 5.2 | 3.6 |
+  | Canter | `3C2B2` | 9.5 | 6.7 |
+  | Gallop | `3D099` | 12 | 10.1 |
+  | Sprint | `3E38E` | 14 | 11.9 |
+  | Stop from a walk, and the backward walk | `3A73F`, then `3A8FC`, `3AAE5` | 0 | Falling, or 1.0 in the backward walk |
+
+  The gait names are inferred from their speeds.
+- **Velocity:** the horizontal size of the vector at `[[actor+0x68]+0x1A0]+0x188` (`x` at `+0x188`, `z` at `+0x190`) is the mount's speed in m/s. It correlates at 0.98 with speed from position, and it reads 0.000 at rest
+  (p99), where position speed went over 0.2 in 33 of 990 rows. Its row-to-row change is 8 to 21 times smaller in a steady gait. It includes the backward walk's position writes, reading 1.0, and takes about a second to fall after
+  they stop. Horse Tap Brake finds the horse by picking the fastest non-player movement object, while `HorseSteer` reads the mount directly.
+
 From the mod only, unconfirmed:
 
-- **Chart state:** `state = [runtime+0x28]`. If byte `[state+0x7A]` is 1–32, `value` is the float at `[runtime+0x38] + word [state+0x78] + 0x18`. The mod treats a changed `state` as a state change and `value == 0` as a
-  braking state. What `value` means, and how a pointer maps to a node number, are unknown.
-- **Velocity:** the mod takes the horizontal size of the vector at `[[actor+0x68]+0x1A0]+0x188` (`x` at `+0x188`, `z` at `+0x190`) as the mount's speed, and picks the fastest non-player movement object as the horse.
 - **Sector position:** the mod treats the rider as mounted when `+0xB4` and `+0xBC`, plus the 16-bit `+0xC0` and `+0xC2` values × 1000, are all within 20 of zero on the rider's `+0x1A0` object. This suggests a per-actor sector
   position, relative to the mount while riding.
 - **Callback:** the mod replaces slots 5 and 6 to get a call for each movement object without patching code. It expects slot 5 to run at least every 500 ms while riding. What calls these slots isn't traced.

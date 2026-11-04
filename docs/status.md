@@ -3,16 +3,19 @@
 Where the mod stands and what to do next. Requirements are in [discovery.md](discovery.md) and evidence is in [findings/](findings/).
 
 **Status:** `src/HorseSteer` is the working mod, and v0.0.1 is the working horse prototype. Forward steering and free look work at walk, trot and gallop, S with A or D pivots, and S alone
-walks the horse backward. The mod pauses during the taming minigame.
+walks the horse backward. The mod pauses during the taming minigame. It's ported to Steam build 26423880 (PE timestamp `0x6AEA07A6`), and the exe copies for this build and 3479 are in `scratch/exe-baseline/`.
+
+## Resume here
+
+Work is on branch `tap-brake-improvements`, and the build in `DMM\mods` matches the source. The Logging and Speed steps are done, so continue with **Lookups** below. `kStateWalk` and the other state constants are low pointer bits, stable across the five sessions checked, so they belong in that work.
+
+The start of the backward walk is otherwise fine at `kBackwardMaxStartSpeed` 0.2: it came slightly later than the times in `findings/backward-walk.md`, and the tester reported no problem.
 
 ## Next
 
 1. Make these early improvements to the horse, using the Horse Tap Brake findings in `findings/offsets.md`. Build and test them in this order, one at a time:
-   - **Logging:** add the mount's chart `state`, `value` and `+0x188` velocity to `HorseSteer.csv`, with no change in behaviour. Test a walk, a gallop, a stop, the backward walk and a freeze after a won minigame. Velocity
-     should follow `speed` without the jumps from chunk changes, and `state` should hold steady within a gait and change between gaits. Record which `state` and `value` the frozen horse shows, as a lead for
-     the freeze below.
-   - **Speed:** if velocity passes, set `g_mountSpeed` from it, updated separately from `WriteTelemetry`, which stops updating it if the CSV can't open or passes 500,000 rows. Forward steering and the backward walk
-     both depend on it, so retest them, and recheck `kBackwardMaxStartSpeed`, which is set to the old position noise.
+   - **Logging:** done in [stage 8](horsesteer-tests/stage-8.md). The results are in `findings/offsets.md`.
+   - **Speed:** done. `g_mountSpeed` comes from velocity, updated in `OnStickRead` every frame ([stage 9](horsesteer-tests/stage-9.md) to [stage 9d](horsesteer-tests/stage-9d.md)). The state drops those tests found are in `findings/backward-walk.md`.
    - **Lookups:** replace fixed addresses with RTTI for vtables, the reference count for `kWorldSystemSlot`, and signatures with exactly one match for code. Have the mod go idle and log which lookup failed. This
      protects the mount work below from a game update.
 

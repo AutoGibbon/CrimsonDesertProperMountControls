@@ -12,15 +12,19 @@ build 1.0.0.3479. Stage tests and results are in `../horsesteer-tests/`, with lo
    speed. Why it doubles is unknown. Most writes don't read back unchanged on the next update, so the game also changes the position. The horse follows slopes and is
    stopped by walls.
 3. **State:** with no stick input, walk nodes such as 137 go to node 186. It loops on `T83`, and with no forward input it only leaves on `TC9(0.1,2)`, which looks
-   like speed under 0.1 m/s. So it holds while the horse keeps moving, and the blend appears to follow the backward movement. This is inferred: the blend's parameters
-   aren't decoded, and no state logging confirms the node.
+   like speed under 0.1 m/s. So it holds while the horse keeps moving, and the blend appears to follow the backward movement. Stage 8 logging showed one chart state held for the whole 16.5 s walk, the
+   same state a walk's stop passes through. The blend's parameters aren't decoded, and which node that state is remains inferred.
 4. **Start:** `UpdateBackwardPulse` waits for the horse to drop below 0.2 m/s, then reads S as forward for 150 ms, once per press, while the movement starts. This gets
    it from idle or a stop into a blended node.
-5. **Steering:** A or D during the walk becomes a steering input of 0.56, and the node's `Rotate` turns the horse with no forward walk. The head turns the way of the key.
+5. **Recovery:** the chart state can leave the walk states `A73F` and `A56E` while the position writes continue, a state drop, which slides the horse in its pose. `UpdateBackwardRecovery` then gives the same 150 ms pulse, at most once a second and not during steering. In stage 9d this returned the state to `A73F` in about 0.3 s from about 1 m/s, with no forward movement.
+6. **Steering:** A or D during the walk becomes a steering input of 0.56, and the node's `Rotate` turns the horse with no forward walk. The head turns the way of the key.
    The horse turns at about 62°/s whatever the input's size. Larger inputs curve the path, at about 0.7 m/s at this setting. A full input leaves the blend.
 
 ## Limits
 
+- The cause of state drops is unknown. Three logged at about 1 m/s came at a grade of about +0.5, but the horse also held `A73F` on stretches up to +0.72, and speed is well above the 0.1 of `TC9(0.1,2)`, so that condition's meaning above is in doubt. Stage 9's state drops within about 0.2 s of releasing A or D, in 8 of 9 cases, didn't reproduce in stages 9b to 9d.
+- Against a wall or stuck on an object, `UpdateBackwardRecovery` pulses once a second for as long as S is held. The tester didn't notice this at a wall. During one stuck stretch on a slope, the horse moved forward at up to 0.71 m/s for about 0.9 s in states `BE4D` and `BFCE`, and whether the pulses caused it is unknown.
+- `kStateWalk`, `kStateWalkSteer` and `kStateWalkStart` are the low 16 bits of a pointer, not a confirmed identity. If they stop matching, recovery doesn't fire.
 - At a wall, the horse backs in until the rider's collider stops it, so its rear goes into the wall.
 - From a walk, trot or gallop, the walk starts after about 1.7, 3.4 or 4.2 s, because the horse stops first. The start can jitter slightly.
 - A or D first from standing depends on the state the horse last left: a forward tight turn after moving forward, or a pivot after reversing or mounting.

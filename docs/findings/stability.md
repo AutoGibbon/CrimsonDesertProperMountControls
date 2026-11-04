@@ -9,6 +9,10 @@ even when they write nothing and without the rodeo stub, and doesn't happen with
 hook causes it, and how, is unknown. No branch in the exe lands inside either hook's patched bytes. Logs are in
 `scratch/probe-runs/` (`f5-off-win`, `no-stub-win`, `no-hooks-win`).
 
+One freeze has been logged with chart state, on Steam build 26423880 (`scratch/probe-runs/stage8/`). The mount's chart reached a state seen nowhere else in that run (`state` ending `372A9`, no `value`, velocity 0) about when the
+minigame ended, and stayed there for about 6 s until the dismount, with W held for about 3.5 s of that, and A and D for part of it. The keys did reach the stick values in both input slots, so the chart isn't leaving the state despite the input. The remount
+put it in `3A73F`, and normal states followed.
+
 ## Crashes and hangs
 
 - **Test chart crash (stage 5, `scratch/probe-runs/stage5-backward/`, with DMM's support bundle in `support/`):** the game crashed during

@@ -75,10 +75,16 @@ constexpr float kSteerRampMs = 300.0f;
 constexpr float kBackwardMoveRate = 0.5f;
 // Reads as forward input for this long, so that the horse leaves idle for a state that uses the walking blend.
 constexpr int kBackwardPulseMs = 150;
-// The backward walk starts once the horse is below this speed in m/s, which is about its position noise at rest.
+// The backward walk starts once the horse is below this speed in m/s, which is near the end of a stop.
 constexpr float kBackwardMaxStartSpeed = 0.2f;
 // A full steering input leaves the walking blend for a forward walk. This size stays in the blend and curves the path.
 constexpr float kBackwardSteer = 0.56f;
+// Low 16 bits of the horse's chart state pointer during the walk, which stay the same between sessions.
+constexpr uint16_t kStateWalkStart = 0xA37D;
+constexpr uint16_t kStateWalk = 0xA73F;
+constexpr uint16_t kStateWalkSteer = 0xA56E;
+// Minimum time between pulses that return the horse to the walk state, in case a pulse doesn't get it there.
+constexpr ULONGLONG kBackwardRecoveryGapMs = 1000;
 constexpr const char* kHorsePackage = "CD_R0001_Horse";
 
 constexpr float kMissing = -9999.0f;
@@ -221,6 +227,37 @@ float ReadSyncYaw(uintptr_t actor) {
     const float n = q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
     if (!std::isfinite(n) || std::fabs(n - 1.0f) > 0.02f) return kMissing;
     return YawDeg(2 * (q[0] * q[2] + q[3] * q[1]), 1 - 2 * (q[0] * q[0] + q[1] * q[1]));
+}
+
+// Read an actor's current chart state pointer and that state's value, leaving value at kMissing if the state has none.
+// Return false if the chain to the state can't be read.
+bool ReadChartState(uintptr_t actor, uintptr_t& state, float& value) {
+    state = 0;
+    value = kMissing;
+    const uintptr_t components = ReadPtr(actor + 0x68);
+    const uintptr_t control = components ? ReadPtr(components + 0x40) : 0;
+    const uintptr_t chartInfo = control ? ReadPtr(control + 0x30) : 0;
+    uint8_t index = 0;
+    if (!chartInfo || !Read(chartInfo + 0x1B, index)) return false;
+    const uintptr_t chart = ReadPtr(control + static_cast<uintptr_t>(index) * 8 + 0x88);
+    const uintptr_t runtime = chart ? ReadPtr(chart + 0x18) : 0;
+    state = runtime ? ReadPtr(runtime + 0x28) : 0;
+    if (!state) return false;
+    uint8_t valueKind = 0;
+    uint16_t valueOffset = 0;
+    const uintptr_t values = ReadPtr(runtime + 0x38);
+    if (values && Read(state + 0x7A, valueKind) && valueKind >= 1 && valueKind <= 32 && Read(state + 0x78, valueOffset)) {
+        float v = 0;
+        if (Read(values + valueOffset + 0x18, v) && std::isfinite(v)) value = v;
+    }
+    return true;
+}
+
+// Read the X and Z of an actor's velocity from its TransformSync object.
+bool ReadVelocity(uintptr_t actor, float& x, float& z) {
+    const uintptr_t components = ReadPtr(actor + 0x68);
+    const uintptr_t sync = components ? ReadPtr(components + 0x1A0) : 0;
+    return sync && Read(sync + 0x188, x) && Read(sync + 0x190, z) && std::isfinite(x) && std::isfinite(z);
 }
 
 // Resolve the controlled actor, its mount through the vehicle component link, and the mount's facing.
@@ -398,6 +435,30 @@ bool UpdateBackwardPulse(bool wanted) {
     return now < g_backwardPulseEnd.load();
 }
 
+// Start another backward pulse if the mount's chart state has left the walk states while the walk is running, so that
+// the walking animation returns. Wait for steering to end, because steering with a pulse is a forward turn.
+void UpdateBackwardRecovery(const Ride& ride, bool steering) {
+    static bool inWalk = false;
+    static ULONGLONG nextAllowed = 0;
+    if (!g_backwardWanted.load() || !g_backwardWalking.load()) {
+        inWalk = false;
+        return;
+    }
+    uintptr_t state = 0;
+    float value = 0;
+    if (!ReadChartState(ride.mount, state, value)) return;
+    const auto id = static_cast<uint16_t>(state);
+    if (id == kStateWalk || id == kStateWalkSteer) {
+        inWalk = true;
+        return;
+    }
+    const ULONGLONG now = GetTickCount64();
+    if (!inWalk || id == kStateWalkStart || steering || now < nextAllowed) return;
+    nextAllowed = now + kBackwardRecoveryGapMs;
+    g_backwardPulseEnd = now + kBackwardPulseMs;
+    Log("backward recovery pulse from state %04X at speed %.2f", id, g_mountSpeed.load());
+}
+
 // Adjust the raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
 // and widen forward steering. On the horse, S alone starts the backward walk, and A or D during it steers.
 void OnStickRead(SafetyHookContext& ctx) {
@@ -407,6 +468,8 @@ void OnStickRead(SafetyHookContext& ctx) {
         g_backwardWalking = false;
         return;
     }
+    float velX = 0, velZ = 0;
+    if (ReadVelocity(ride.mount, velX, velZ)) g_mountSpeed = std::hypot(velX, velZ);
     float stick[2];
     if (!SafeRead(ctx.rdi + kInput_RawStick, stick, sizeof stick)) return;
     const float ramp = SteerRamp(stick[0]);
@@ -415,6 +478,7 @@ void OnStickRead(SafetyHookContext& ctx) {
     const bool reverseSteering = backward && steering && g_backwardWalking.load();
     const bool isHorse = ride.mount == g_horseMount.load();
     const bool pulse = UpdateBackwardPulse(isHorse && backward && (!steering || reverseSteering));
+    UpdateBackwardRecovery(ride, steering);
     if (backward) {
         stick[1] = pulse ? 1.0f : 0.0f;
         if (reverseSteering) stick[0] = std::copysign(kBackwardSteer, stick[0]);
@@ -505,7 +569,6 @@ void WriteTelemetry(const Ride& ride) {
         const float dt = static_cast<float>(now - lastTick) / 1000.0f;
         const float dx = world.x - lastPos.x, dz = world.z - lastPos.z;
         speed = std::hypot(dx, dz) / dt;
-        g_mountSpeed = speed;
         if (speed > 0.1f) travelYaw = YawDeg(dx, dz);
     }
     if (haveRider) {
@@ -523,6 +586,13 @@ void WriteTelemetry(const Ride& ride) {
         fprintf(g_csv, ",%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", s.applied.load() ? 1 : 0, s.stickX.load(), s.stickY.load(),
                 s.angle.load(), s.relative.load(), s.cameraYaw.load(), s.targetYaw.load());
     }
+    uintptr_t chartState = 0;
+    float chartValue = kMissing, velX = kMissing, velZ = kMissing;
+    if (ride.mount) ReadChartState(ride.mount, chartState, chartValue);
+    const bool haveVelocity = ride.mount && ReadVelocity(ride.mount, velX, velZ);
+    fprintf(g_csv, ",%llX,%.3f,%.3f,%.3f,%.3f,%.2f", static_cast<unsigned long long>(chartState), chartValue,
+            haveVelocity ? velX : kMissing, haveVelocity ? velZ : kMissing,
+            haveVelocity ? std::hypot(velX, velZ) : kMissing, haveRider ? world.y : kMissing);
     fputc('\n', g_csv);
     ++rows;
     if (now - lastFlush > 1000) {
@@ -584,7 +654,8 @@ DWORD WINAPI ModThread(void* param) {
         fputs("tick_ms,w,a,s,d,enabled,flip,mounted,mount_key,forward_from_mount,rider_phys_yaw,mount_phys_yaw,"
               "rider_sync_yaw,mount_sync_yaw,speed,travel_yaw,"
               "i0_applied,i0_stick_x,i0_stick_y,i0_angle,i0_relative,i0_camera_yaw,i0_target_yaw,"
-              "i1_applied,i1_stick_x,i1_stick_y,i1_angle,i1_relative,i1_camera_yaw,i1_target_yaw\n", g_csv);
+              "i1_applied,i1_stick_x,i1_stick_y,i1_angle,i1_relative,i1_camera_yaw,i1_target_yaw,"
+              "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y\n", g_csv);
     }
     g_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
 
