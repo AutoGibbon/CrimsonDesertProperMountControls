@@ -1,7 +1,8 @@
 // Horse-relative riding controls: on ground mounts, replaces the camera direction vectors in
 // ClientInputActorComponent's per-frame update with the mount's, so move input is resolved against the mount's facing.
 // Also widens and ramps in forward steering angles, and removes backward input, which leaves S with a steering input as
-// a pivot. All of this stops while the taming minigame runs, because it needs the game's own input directions.
+// a pivot. On the horse, S also walks it backward from a near stop. All of this stops while the taming minigame runs,
+// because it needs the game's own input directions.
 //
 // F5        toggle the mod
 // Shift+F5  flip the forward direction
@@ -23,6 +24,8 @@
 #include "safetyhook.hpp"
 
 namespace {
+
+constexpr const char* kVersion = "0.0.1";
 
 // Build 1.0.0.3479.
 constexpr uint32_t kPeTimestamp = 0x6AE6E3E8;
@@ -68,6 +71,15 @@ constexpr float kTightSteerSpeed = 2.5f;
 constexpr float kWideSteerSpeed = 5.0f;
 constexpr float kMaxSteerAngle = 85.0f / 57.29578f;
 constexpr float kSteerRampMs = 300.0f;
+// Added to the horse's position per second during the backward walk. It moves at about twice this, roughly 1 m/s.
+constexpr float kBackwardMoveRate = 0.5f;
+// Reads as forward input for this long, so that the horse leaves idle for a state that uses the walking blend.
+constexpr int kBackwardPulseMs = 150;
+// The backward walk starts once the horse is below this speed in m/s, which is about its position noise at rest.
+constexpr float kBackwardMaxStartSpeed = 0.2f;
+// A full steering input leaves the walking blend for a forward walk. This size stays in the blend and curves the path.
+constexpr float kBackwardSteer = 0.56f;
+constexpr const char* kHorsePackage = "CD_R0001_Horse";
 
 constexpr float kMissing = -9999.0f;
 constexpr float kRadToDeg = 57.29578f;
@@ -106,6 +118,10 @@ std::atomic<float> g_mountSpeed{0};
 std::atomic<int> g_steerSide{0};
 std::atomic<ULONGLONG> g_steerStart{0};
 volatile uint64_t* g_rodeoCalls = nullptr;
+std::atomic<uintptr_t> g_horseMount{0};
+std::atomic<ULONGLONG> g_backwardPulseEnd{0};
+std::atomic<bool> g_backwardWanted{false};
+std::atomic<bool> g_backwardWalking{false};
 
 void Log(const char* fmt, ...) {
     if (!g_log) return;
@@ -180,12 +196,17 @@ uintptr_t FindActor(uintptr_t manager, uint32_t key) {
     return 0;
 }
 
-// Read the Z axis and position of an actor's physics object.
-bool ReadPhysics(uintptr_t actor, Vec3& axisZ, Vec3* position = nullptr) {
+// Return an actor's physics object, or 0.
+uintptr_t PhysicsObject(uintptr_t actor) {
     const uintptr_t components = ReadPtr(actor + 0x68);
     const uintptr_t control = components ? ReadPtr(components + 0x40) : 0;
     const uintptr_t inner = control ? ReadPtr(control + 0x140) : 0;
-    const uintptr_t physics = inner ? ReadPtr(inner + 0x2C0) : 0;
+    return inner ? ReadPtr(inner + 0x2C0) : 0;
+}
+
+// Read the Z axis and position of an actor's physics object.
+bool ReadPhysics(uintptr_t actor, Vec3& axisZ, Vec3* position = nullptr) {
+    const uintptr_t physics = PhysicsObject(actor);
     if (!physics || !Read(physics + 0x80, axisZ) || !Finite(axisZ)) return false;
     if (position && (!Read(physics + 0x90, *position) || !Finite(*position))) return false;
     return true;
@@ -305,6 +326,38 @@ bool ApplyMountDirection(uintptr_t input, const Ride& ride, InputSample& sample)
            SafeWrite(input + kInput_CameraRight, &newRight, sizeof newRight);
 }
 
+// Move the horse backward along its facing while g_backwardWanted is set, starting once it's below kBackwardMaxStartSpeed.
+// The move goes through its physics position, so the game still applies ground height and collisions.
+void UpdateBackwardWalk(const Ride& ride) {
+    static bool active = false;
+    static LARGE_INTEGER last{};
+
+    const uintptr_t physics = PhysicsObject(ride.mount);
+    Vec3 axisZ{}, position{};
+    if (!g_backwardWanted.load() || !physics || !Read(physics + 0x80, axisZ) || !Read(physics + 0x90, position)) {
+        active = false;
+        g_backwardWalking = false;
+        return;
+    }
+    LARGE_INTEGER now, frequency;
+    QueryPerformanceCounter(&now);
+    QueryPerformanceFrequency(&frequency);
+    if (!active) {
+        if (g_mountSpeed.load() >= kBackwardMaxStartSpeed) return;
+        active = true;
+        g_backwardWalking = true;
+        last = now;
+        return;
+    }
+    const float dt = std::min(static_cast<float>(now.QuadPart - last.QuadPart) / frequency.QuadPart, 0.1f);
+    last = now;
+    const float len = std::hypot(axisZ.x, axisZ.z);
+    if (len < 0.001f) return;
+    position.x += axisZ.x / len * kBackwardMoveRate * dt;
+    position.z += axisZ.z / len * kBackwardMoveRate * dt;
+    SafeWrite(physics + 0x90, &position, sizeof position);
+}
+
 void OnInputUpdate(SafetyHookContext& ctx) {
     const uintptr_t input = ctx.rdi;
     uintptr_t actor = 0;
@@ -325,17 +378,46 @@ void OnInputUpdate(SafetyHookContext& ctx) {
     bool applied = false;
     if (RidingGroundMount(ride) && ride.haveForward) applied = ApplyMountDirection(input, ride, sample);
     sample.applied = applied;
+    if (RidingGroundMount(ride) && actor == ride.mount && ride.mount == g_horseMount.load()) UpdateBackwardWalk(ride);
 }
 
-// Adjust the raw stick before the update reads it: clear backward input, because the horse chart has no route into its
-// backward walk, and widen forward steering.
+// Return whether backward input should read as forward for now: for kBackwardPulseMs once the horse is below
+// kBackwardMaxStartSpeed, once per press.
+bool UpdateBackwardPulse(bool wanted) {
+    static std::atomic<bool> pulsed{false};
+    g_backwardWanted = wanted;
+    const ULONGLONG now = GetTickCount64();
+    if (!wanted) {
+        pulsed = false;
+        g_backwardPulseEnd = 0;
+        return false;
+    }
+    if (g_mountSpeed.load() < kBackwardMaxStartSpeed && !pulsed.exchange(true)) {
+        g_backwardPulseEnd = now + kBackwardPulseMs;
+    }
+    return now < g_backwardPulseEnd.load();
+}
+
+// Adjust the raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
+// and widen forward steering. On the horse, S alone starts the backward walk, and A or D during it steers.
 void OnStickRead(SafetyHookContext& ctx) {
-    if (!RidingGroundMount(ResolveRide())) return;
+    const Ride ride = ResolveRide();
+    if (!RidingGroundMount(ride)) {
+        g_backwardWanted = false;
+        g_backwardWalking = false;
+        return;
+    }
     float stick[2];
     if (!SafeRead(ctx.rdi + kInput_RawStick, stick, sizeof stick)) return;
     const float ramp = SteerRamp(stick[0]);
-    if (stick[1] < 0.0f) {
-        stick[1] = 0.0f;
+    const bool backward = stick[1] < 0.0f;
+    const bool steering = std::fabs(stick[0]) > 0.01f;
+    const bool reverseSteering = backward && steering && g_backwardWalking.load();
+    const bool isHorse = ride.mount == g_horseMount.load();
+    const bool pulse = UpdateBackwardPulse(isHorse && backward && (!steering || reverseSteering));
+    if (backward) {
+        stick[1] = pulse ? 1.0f : 0.0f;
+        if (reverseSteering) stick[0] = std::copysign(kBackwardSteer, stick[0]);
     } else if (stick[1] > 0.0f && std::fabs(stick[0]) > 0.01f) {
         WidenSteering(stick[0], stick[1], g_mountSpeed.load(), ramp);
     } else {
@@ -468,7 +550,8 @@ std::wstring ModuleDir(HMODULE module) {
 bool InstallHook() {
     const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(g_base);
     const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(g_base + dos->e_lfanew);
-    Log("loaded: base %p, PE timestamp 0x%08X", reinterpret_cast<void*>(g_base), nt->FileHeader.TimeDateStamp);
+    Log("HorseSteer %s loaded: base %p, PE timestamp 0x%08X", kVersion, reinterpret_cast<void*>(g_base),
+        nt->FileHeader.TimeDateStamp);
     if (nt->FileHeader.TimeDateStamp != kPeTimestamp) {
         Log("unsupported game build: hook not installed");
         return false;
@@ -547,6 +630,7 @@ DWORD WINAPI ModThread(void* param) {
         }
         if (ride.mount != classified) {
             g_groundMount = 0;
+            g_horseMount = 0;
             classified = 0;
             if (ride.mount) {
                 const std::string package = ReadPackageName(ride.mount);
@@ -555,6 +639,7 @@ DWORD WINAPI ModThread(void* param) {
                     reportedUnreadable = false;
                     const bool ground = IsGroundMountPackage(package);
                     if (ground) g_groundMount = ride.mount;
+                    if (package == kHorsePackage) g_horseMount = ride.mount;
                     Log("mount package: %s (%s)", package.c_str(), ground ? "controls on" : "not a ground mount, mod inactive");
                 } else if (!reportedUnreadable) {
                     reportedUnreadable = true;

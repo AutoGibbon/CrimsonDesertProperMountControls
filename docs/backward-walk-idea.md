@@ -1,58 +1,37 @@
-# Idea: horse backward walk
+# Horse backward walk
 
-Not started. S currently coasts, and pivots with A or D. RDR2 also backs up, and this would add that through a chart patch paired with
-the ASI.
-The ASI is still needed either way, because horse-relative movement is outside the chart data.
+S from standing walks the horse backward, as in RDR2. It's built into `HorseSteer` with no chart patch, and is limited to `CD_R0001_Horse`. Analysed on
+build 1.0.0.3479. Stage tests and results are in `horsesteer-test.md`, with logs in `scratch/probe-runs/stage5*/`.
 
-## Findings
+## How it works
 
-Analysed on build 1.0.0.3479. The horse chart is `upperaction/4_riding/r0001_horserd2_movetest_03_upper.paac`.
+1. **Clip:** `character/binary/motionblending/horse/locomotion.motionblending` is a `ParameterizedMotionSpace` whose clips include
+   `cd_rd_prh_00_00_nor_move_walk_b_step3_00`, `bl_step3` and `br_step3`. The `walk_s` stop nodes (15, 28, 186, 271, 279) and many walk nodes use it. Idle (134)
+   and the end of a stop (20) use no blend, so moving the horse there slides it in its pose.
+2. **Movement:** `UpdateBackwardWalk` adds to the physics object's position at `+0x90`. A rate of 0.5 moves the horse at about 1 m/s, and the feet match at that
+   speed. Why it doubles is unknown. Most writes don't read back unchanged on the next update, so the game also changes the position. The horse follows slopes and is
+   stopped by walls.
+3. **State:** with no stick input, walk nodes such as 137 go to node 186. It loops on `T83`, and with no forward input it only leaves on `TC9(0.1,2)`, which looks
+   like speed under 0.1 m/s. So it holds while the horse keeps moving, and the blend appears to follow the backward movement. This is inferred: the blend's parameters
+   aren't decoded, and no state logging confirms the node.
+4. **Start:** `UpdateBackwardPulse` waits for the horse to drop below 0.2 m/s, then reads S as forward for 150 ms, once per press, while the movement starts. This gets
+   it from idle or a stop into a blended node.
+5. **Steering:** A or D during the walk becomes a steering input of 0.56, and the node's `Rotate` turns the horse with no forward walk. The head turns the way of the key.
+   The horse turns at about 62°/s whatever the input's size. Larger inputs curve the path, at about 0.7 m/s at this setting. A full input leaves the blend.
 
-| State | Node | Hash | Clip |
-| --- | --- | --- | --- |
-| Start | 4 | `0x0767D84A` | `cd_rd_prh_basic_00_00_nor_move_walk_b_stt_00.paa` |
-| Loop | 43 | `0x2CC7DE9C` | `cd_rd_prh_basic_00_00_nor_move_walk_b_ing_00.paa` |
-| End | 226 | `0xCD9A3CBD` | `cd_rd_prh_basic_00_00_nor_move_walk_b_end_00.paa` |
+## Limits
 
-- **No route in:** no other state branches into these three. Start and End only branch to themselves, and nothing targets Loop.
-- **Other end state:** node 69 (`walk_b_end_000`) has a branch from elsewhere, but it's a separate clip.
-- **Conflicts:** no installed mod replaces this chart.
-- **Wagon chart:** `r0012_wagon_upper.paac` contains the same three hashes, but not as states or branch targets. Their purpose is unknown.
-- **Rider:** no rider clips for reversing on a horse were found.
+- At a wall, the horse backs in until the rider's collider stops it, so its rear goes into the wall.
+- From a walk, trot or gallop, the walk starts after about 1.7, 3.4 or 4.2 s, because the horse stops first. The start can jitter slightly.
+- A or D first from standing depends on the state the horse last left: a forward tight turn after moving forward, or a pivot after reversing or mounting.
+- The walk is limited to the horse for now. Other land mounts have their own charts and are untested. Next, check whether the same technique works on the mounts in
+  `kGroundMountPackages`: which blend files have backward clips, and which stop states hold while the mount keeps moving.
 
-## Chart format
+## What didn't work
 
-Field names are inferred from the data. `scratch/cdmw-src/cdmw/core/action_chart_binary.py` parses the sections.
-
-- **Node:** `+0x18` is the state hash. `+0xE4` (u16) and `+0xE8` (u16) are the first index and count in the 32-byte branch
-  records.
-- **Branch record (32 bytes):** `+0x0C` (u16) is the index into `branchInstanceArray`.
-- **Branch (0x38 bytes):** `+0x14` is the target state hash. `+0x24` and `+0x26` (u16) each start a condition list in the condition
-  indices, with lengths in the bytes at `+0x2A` and `+0x2B`. Key checks are in the second list.
-- **Condition list:** each index is a dword offset into the condition bytecode, and tokens read as prefix expressions: `0x287` AND,
-  `0x288` OR, `0x289` NOT.
-- **Condition:** type `0xEA` looks like a key check, with a name table index and a hash after it. Combat Evolved's log also
-  calls type 234 its key condition, and type 238 (`0xEE`) skill usable, which takes a skill ID.
-- **Adding branches:** point a node's record range at a copy appended to the end of the table, so no other index moves. This
-  is untested.
-
-## Open questions
-
-1. Does the clip move the horse backward, or only animate on the spot? If it doesn't move, the ASI would have to move the
-   horse, and this is probably not worth doing.
-2. Does the rider look acceptable?
-3. What triggers it: a key name the game accepts for S, or the ASI answering an existing key check? `exe+0x3B0150` is a game
-   key check, according to Combat Evolved's log.
-
-## Next step
-
-Run one experiment before building anything: retarget an existing idle branch that fires on a key press to `0x0767D84A`, a
-4-byte change, and ship it as a DMM mod. The tester presses that key while standing on the horse. This answers questions 1
-and 2. The horse may get stuck in the state, because it has no way out, so use a throwaway save or reload afterwards.
-
-## If it works
-
-- Add the missing links: idle to Start, Start to Loop, and End to idle. Loop to End already exists.
-- While reversing, stop the ASI treating S as a brake or as "turn around".
-- Generate the patched chart from the current game file, because a fixed copy can break or overwrite game changes on any
-  update. CDMW refuses branch edits, so this needs its own patcher.
+- **The `walk_b` nodes:** nodes 4, 43 and 226 have clips but no branch in from another state, and no move speed data. Routed through a stop with a chart patch, they
+  animate on the spot.
+- **Chart move speed data:** an unused animation with a move speed record (node 204), with speed -1 and animation header `+0x6C` at -3, didn't move the horse with no keys,
+  W held or S held. On moving animations, `+0x6C` equals speed times clip duration.
+- **Loose chart file:** the patched chart in a DMM group folder crashed during loading once. The same bytes as a JSON byte patch (`patches` with `offset`, `original` and
+  `patched`) loaded every time, so use that for any future chart edit.

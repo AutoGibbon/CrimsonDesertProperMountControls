@@ -139,14 +139,14 @@ Build and test one stage at a time. Each stage must be tested in game before the
 ## Resuming work
 
 - **Status:** `src/HorseSteer` is the working mod; the "Minimal mod" section above is superseded, because the mod replaces the
-  camera vectors rather than the stick. Forward steering and free look work at walk, trot and gallop, and S with A or D pivots.
+  camera vectors rather than the stick. Forward steering and free look work at walk, trot and gallop, S with A or D pivots, and S alone walks the horse
+  backward.
 - **Next:**
-  1. Make S a brake while moving and a backward walk while stopped, as the tester asked. Start with two tests: the tester dashes
-     (`Key_Run` repeatedly) and presses Alt, with and without A or D, to see if `gallop_f_slip_end` is the stop they want; and the
-     one-branch experiment in `backward-walk-idea.md`, to see if the backward clips move the horse. Both need chart patches, and
-     their branch format is shared. See the `key_brake` finding in `discovery.md` for why the key check alone isn't enough.
-  2. Limit S handling to `CD_R0001_Horse`, because clearing backward input may block backsteps and backward walks on other mounts,
-     such as the wolf and elephant.
+  1. Get every legged ground mount working, which a public release requires. v0.0.1 is the working horse prototype, and how its backward walk works is in
+     `backward-walk-idea.md`. For each mount in `kGroundMountPackages`, check the controls and whether that technique applies, and confirm the list has every legged
+     mount. This also decides how S should work on them: clearing backward input may block backsteps and backward walks on mounts such as the wolf and elephant, so limit
+     that to the horse where the technique doesn't apply. The test save has only one basic mount, so start from game data.
+  2. Investigate carriages, which should get similar controls if possible. They aren't in `kGroundMountPackages` yet.
   3. Before any public release, find which input hook causes the freeze after a won minigame, by testing each alone, then try moving
      it. The tester accepts a remount until then.
   4. Replace fixed addresses with signature scans, and test more mounts when the user has access to them.

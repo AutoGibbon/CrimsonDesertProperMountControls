@@ -11,15 +11,14 @@ Replicate Red Dead Redemption 2's horse-relative controls, through a native ASI 
 
 ## Requirements
 
-- **Forward/back:** W moves the horse along its own facing. S should be a hard brake, slowing the horse faster than releasing W.
-  This is planned after stage 3; S currently only clears backward input, which coasts like releasing W. RDR2 also backs up,
-  but the horse chart has no route into its backward walk.
+- **Forward/back:** W moves the horse along its own facing. S from standing walks the horse backward, as in RDR2. S is not a brake or a drift trigger: the tester dropped both, because players press
+  S while riding to turn, which would start unwanted drifts, and it makes escaping a drift harder.
 - **Steering:** A and D change the horse's heading while held. With no other input the horse walks in a small radius,
   and releasing W while steering at speed gives a tighter turn. The user wants to keep both behaviours.
 - **Pivot:** S with A or D turns the horse nearly on the spot, at about 52°/s and 0.5 m/s, and the user wants to keep it.
 - **Camera:** looking around freely never changes the horse's course.
 - **Input:** keyboard and mouse. Controller support is optional for now.
-- **Mounts:** horses and ground mounts based on them. The exosuit/mech suit is excluded.
+- **Mounts:** a public release needs every legged ground mount to work. Carriages should get similar controls if possible. The exosuit/mech suit is excluded.
 
 ## Done when
 
@@ -35,8 +34,9 @@ against the mount's facing, so the camera stays free. Test status is in `docs/ho
 | Unknown | Status |
 | --- | --- |
 | Forward, steering and free look | Working at walk, trot and gallop, tested in game |
-| Reversing | Not reachable through input: `walk_b_stt`, `ing` and `end` have no branch in from any other state. Backward stick input is cleared at `exe+0xB6C5A6` instead |
-| Hard brake on S | Not started. Answering `key_brake` alone won't stop harder: see the `key_brake` finding below. It needs chart branches from the normal gaits into stopping clips, or slowing the horse directly |
+| Brake on S | Dropped and removed after stage 5. Alt still brakes and drifts as in the base game |
+| Backward walk | Working in game on the horse, in v0.0.1 (stage 6). The ASI moves the horse backward through its physics position, which plays the game's own blended backward walk. Other mounts are next. See `backward-walk-idea.md` |
+| Drift recovery | Not a confirmed problem. The tester saw rougher recovery in stage 5 and suspects needing S to start the drift made the escape inputs harder. Removing S as the trigger should remove that factor; recheck only if it's still noticed with Alt |
 | Taming minigame | Working in game: the mod pauses while the rodeo UI's frame slot is being called. Known issue: the horse ignores input after a win until the rider dismounts and remounts |
 | Mount check | The action package name at `[[[[mount+0x68]+0x40]+0x28]+0x18]+0x48` must be in the land-mount list in `HorseSteer.cpp`. Working on the horse in game; other mounts are untested and use their own charts. `CD_M0003_CucuBird` is included; it has gliding states that are untested |
 | Game camera follow and lookahead on | Not tested; the game hit a GPU reset when they were turned back on |
@@ -145,11 +145,38 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
 - **`key_brake`:** bound to Alt, mouse X2 and gamepad B, in the same `CharacterAction` group that on-foot charts read, so S can't be
   added to it in `inputmap.xml`. The game's text describes it as "Drift ... while dashing". Most horse uses are `OR T10 key_brake`,
   and `T10` is probably "no stick input", which fits the tester finding that Alt at normal gaits feels the same as releasing W. The
-  slide stop, `gallop_f_slip_end`, is only entered from the drift-end and `faststart` clips and two special gallop states. Drift
-  start needs `SKILL_USABLE(12007)`. These skill IDs have not been matched to names or unlock rules.
-- **Key check:** `exe+0x3B0150` reads a key hash from its condition at `+8`, but the live function starts with a jump to a
-  non-module address (`0x13FFD003C` in the logged runs), so something else hooks it at runtime. Combat Evolved's log says it only
-  calls this function. Which return value means pressed is unconfirmed.
+  slide stop, `gallop_f_slip_end`, is only entered from the drift-end and `faststart` clips and two special gallop states. In those
+  gallop states, the `T10` branch is tested before `key_brake`, so braking needs a stick input. Drift starts from the slide stop, with
+  `key_brake`, a steering angle past 45° and `SKILL_USABLE(12007)`. These skill IDs have not been matched to names or unlock rules.
+  The tester reports that brake with A or D drifts in game, quickly slowing the horse and turning it to that side.
+- **`key_brake` on other mounts:** of the land-mount ride charts, only the wolf and warthog read it, in one walk branch each,
+  `OR T10 key_brake`. The bear, camel, reindeer, elephant, iguana, Carma bird and cucu bird ride charts don't read it.
+- **Key check:** `exe+0x3B0150` is the handler for condition type `0xEA`. The handler table comes from `exe+0x3A9FC0`, at index
+  `type - 0x83`. The handler reads the key hash from the condition at `+8` and the actor from the context at `+8`. `key_brake`'s
+  hash is `0x377B9DB8`. Its live code starts with a jump to a non-module address (`0x13FFD003C` in the logged runs), so something
+  hooks it at runtime. It returns 0 when the key is pressed: the game's answer was 1 except during brief presses, and answering 0
+  on S started drifts in game. Replacing the table slot worked alongside the existing hook. That code was removed with the brake and is saved in
+  `scratch/probe-runs/stage5-brake/s-brake.patch`.
+- **Stage 5 test chart crash (`scratch/probe-runs/stage5-backward/`):** the game crashed during loading on the only run with
+  `HorseSteer Backward Walk Test` on, with the same `HorseSteer` build that loaded in part 1. It read a null vtable on the main thread
+  at `exe+0x15D3E2A`, calling through `[rdi+0x160]`, which held the static object `exe+0x6E87008`. No mod is on the logged stack.
+  In stage 5b the same 7 edits loaded and played without a crash as a JSON byte patch, and the built chart differed from the original
+  by only those bytes, so the edits aren't the cause. Whether the loose file caused the crash or it was intermittent is unknown.
+  DMM's support bundle, extracted to `support/` there, shows the chart in its manifest, and it's the only `actionchart/bin__` file in
+  that manifest, so no other enabled mod shows that DMM can deliver a binary chart. `DmmRuntime.log` stops at 23:04:49, 25 s before the
+  crash, and doesn't list the chart, so it doesn't show whether the game read it. The dump doesn't include the object at `rdi`.
+  In stage 5b the chart was served 33 s after the same textures that ended the crash run's log, and the crash came 25 s after them, so
+  the game may not have read the chart before crashing. CDMW's research notes report edited charts in DMM group folders loading and
+  working on this exe with DMM 1.0, which also counts against the loose file.
+- **Stage 5 S brake (`scratch/probe-runs/stage5-brake/`):** speeds are noisy, and each comparison below has few samples.
+  - **S alone:** 8.1 m/s to under 1 m/s in 2.3 s, against 2.3 s from 7.1 m/s for one clean W release. From 13.2 m/s, it reached
+    1.4 m/s in 3.2 s. The tester saw no difference from releasing W, and no slide without steering.
+  - **S with A or D:** at 13–15 m/s the horse turned at 110–200°/s on average during the press, and the tester saw a drift. At
+    11–12 m/s it turned at 70–85°/s with no drift.
+  - **Standing:** S does nothing, and S with D pivoted at about 50°/s and 0.4 m/s.
+  - **Drift recovery:** many drifts fall to about 0 m/s within 2 s, then reach about 10 m/s by 6 s, even with W held. Speed fell
+    below 3 m/s within 5 s in 6 of 17 Alt drifts with the mod on and 1 of 7 with it off, with W held about as long in both. It also
+    did in 6 of 8 S drifts, but W was held for less of those. The cause is untraced.
 - **Taming minigame:** it needs input pointing at the mount's tail, and it reads the movement data the mod edits: holding S wins it
   with ease while backward input reaches the game. The package name can't separate wild horses from tamed ones.
 - **Rodeo signal:** slot 47 of `UIGamePlayControlRootMiniGameRodeo`'s vtable (`exe+0x5A6CBF8`) ran about 70 times a second during
