@@ -2,7 +2,7 @@
 
 `HorseProbe.asi` logs riding data and finds the WASD input value in memory. It does not change game memory or controls.
 
-Record your observations in [horseprobe-results.md](horseprobe-results.md) as you go.
+Record your observations in [results.md](results.md) as you go.
 
 ## Setup
 

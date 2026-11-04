@@ -1,6 +1,6 @@
 # HorseProbe test results
 
-Test steps: [horseprobe-test.md](horseprobe-test.md). Leave anything you didn't test blank.
+Test steps: [test.md](test.md). Leave anything you didn't test blank.
 
 ## Session
 

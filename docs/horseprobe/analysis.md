@@ -1,11 +1,11 @@
-# HorseProbe analysis and next steps
+# HorseProbe analysis
 
-Use this after a [HorseProbe test](horseprobe-test.md) to interpret the results and choose the next step. The goal and
-findings so far are in [discovery.md](discovery.md).
+Use this after a [HorseProbe test](test.md) to interpret the results and choose the next step. The goal is in
+[discovery.md](../discovery.md) and the findings are in [findings/](../findings/).
 
 ## Inputs
 
-- `docs/horseprobe-results.md`: what the tester saw and heard.
+- `docs/horseprobe/results.md`: what the tester saw and heard.
 - `Z:\SteamLibrary\steamapps\common\Crimson Desert\bin64\HorseProbe.log`: load status, scan results and write watch
   results.
 - `bin64\HorseProbe.csv`: telemetry at about 10 rows per second, paused during scan passes.
@@ -108,7 +108,7 @@ doesn't make sense.
 Don't ask the tester to disable mods as a first step, because some of their saves may depend on them. Disable only mods
 they confirm are safe, one at a time.
 
-## Minimal mod
+## Minimal mod (superseded, see [status.md](../status.md))
 
 Hook the writer or the first reader with [SafetyHook](https://github.com/cursey/safetyhook), not a polling thread, so the
 value is replaced between the game's write and its read.
@@ -135,73 +135,3 @@ Build and test one stage at a time. Each stage must be tested in game before the
    exclude the exosuit/mech suit.
 6. **Updates:** replace fixed addresses with signature scans, and disable the mod safely if one fails.
 7. **Compatibility:** test alongside the tester's usual mods. Controller support is optional, after this stage.
-
-## Resuming work
-
-- **Status:** `src/HorseSteer` is the working mod; the "Minimal mod" section above is superseded, because the mod replaces the
-  camera vectors rather than the stick. Forward steering and free look work at walk, trot and gallop, S with A or D pivots, and S alone walks the horse
-  backward.
-- **Next:**
-  1. Get every legged ground mount working, which a public release requires. v0.0.1 is the working horse prototype, and how its backward walk works is in
-     `backward-walk-idea.md`. For each mount in `kGroundMountPackages`, check the controls and whether that technique applies, and confirm the list has every legged
-     mount. This also decides how S should work on them: clearing backward input may block backsteps and backward walks on mounts such as the wolf and elephant, so limit
-     that to the horse where the technique doesn't apply. The test save has only one basic mount, and the tester is working out how to reach others, so wait for that
-     before continuing. Then work through these, starting with mounts whose data and mechanisms are closest to the horse's:
-     - Confirm each listed package's ride chart and blend files. `character/binary/motionblending/horse/` also has `donkey_move`, so check how donkeys and other horse
-       variants are covered. `tools/mount_census.py` lists the vehicle types and `Riding_` characters, and `discovery.md` has the open questions on the ibex and donkeys.
-     - Look for backward clips in those blend files, and for a stop state like horse node 186, which holds while the mount keeps moving.
-     - Look for existing backward moves that clearing S would block.
-     - Sort the mounts into those where the horse method should work as it is, those needing changes, and those with no backward clips, then test in game.
-  2. Investigate carriages, which should get similar controls if possible. This is expected to be separate work, with its own round of probe logging and code execution
-     capture. They aren't in `kGroundMountPackages`, and the wagon has its own charts (`r0012_wagon_upper`, which reads `key_brake`, and `ride_carriage_lower` and
-     `ride_carriage_upper`). The first question is whether replacing the camera vectors applies to them.
-  3. Before any public release, find which input hook causes the freeze after a won minigame, by testing each alone, then try moving
-     it. The tester accepts a remount until then.
-  4. Replace fixed addresses with signature scans.
-  5. Update `g_mountSpeed` separately from `WriteTelemetry`, which stops updating it if the CSV can't open or passes 500,000 rows. Forward steering and the backward walk
-     both depend on it. Remove the CSV and other test logging for release.
-  6. Retest the taming minigame on the current build. Stage 6 didn't reach it, because wild horses take a long time to find.
-- **Chart decoding:** `scratch/analysis/chart_branches.py CDMW_SRC CHART_DIR` prints the horse chart's `key_brake` branches, the
-  branches into the slide and drift states, and its skill conditions, with conditions decoded.
-- **Steering tuning:** stage 4 passed in game, and the tester rated `kSteerRampMs`, `kTightSteerFactor` and `kWideSteerFactor`
-  about right, so leave them as they are. To test a new build, turn `HorseSteer` off and on in DMM and apply, so that it's
-  copied to `bin64`.
-- **Probe:** `HorseProbe` and its docs are finished diagnostics. Its source stays as a template for watches and scans. The mount
-  scan was removed from `HorseSteer`; its output is in `scratch/probe-runs/steer5/` and the last version with it is not committed.
-- **HorseSteer deployment:** it needs a DMM off/on cycle after each new build. If a save won't load, check for a stale
-  `bin64\dmm\manifest.tsv` before suspecting the mod, as described in `discovery.md`.
-- **HorseSteer logs:** `bin64\HorseSteer.log` records the hook install, mount changes and which actor each input slot
-  belongs to. `bin64\HorseSteer.csv` is written about 10 times a second while mounted. Slot `i0` is the rider's input
-  component and `i1` is the horse's. With W held and the mod working, `mount_phys_yaw` and `travel_yaw` stay steady while
-  `i0_camera_yaw` changes, and `travel_yaw` is about 180° from `mount_phys_yaw`. `i0_relative` tracks the mount's heading,
-  not 0.
-- **Static analysis:** `tools/disasm.py` reads the on-disk exe, and addresses in `.sxdata` disassemble cleanly there, so
-  Ghidra has not been needed.
-- **Not installed:** Cheat Engine, Ghidra and x64dbg. Ghidra 12.2 needs Java 25 and this machine has JRE 17, so add a
-  portable JDK under `scratch/` if it's needed. Installing Cheat Engine needs the user's admin prompt:
-  `choco install cheatengine -y`.
-- **CDMW:** the tools use its source as a library. `scratch/cdmw-release/CDMW.exe` is downloaded but has never been run.
-- **Requirements:** in `discovery.md`. Free look is mandatory, which rules out camera-only fixes.
-- **Mods:** other mods stay enabled during tests unless the tester agrees otherwise.
-- **Updates:** the game can update at any launch, and Steam's update setting doesn't prevent it. The current exe is saved
-  at `scratch/exe-baseline/CrimsonDesert_3479.exe`.
-- **Repo state:** check `git log` and `git status`.
-- **Git-ignored local data:** `scratch/` is about 1 GB, and the agent manages it. Don't commit it or `build/`.
-  - `exe-baseline/`: can't be recreated after a game update, so don't delete it.
-  - `venv/`: Python 3.12 with `lz4 cryptography Pillow numpy capstone`. Run the tools with
-    `scratch/venv/Scripts/python`.
-  - `probe-runs/`: saved probe logs. Copy each test's logs here before they can be deleted or overwritten.
-  - `caballo.md`: CrimsonDesertCoop's horse research (`docs/research/caballo-coop.md`), written for build 2976.
-  - `cdmw-src/`: CDMW source at commit `585ac51`, with no `.git`. To recreate it, run
-    `git clone https://github.com/Ratty123/CDMW-Full scratch/cdmw-src`.
-  - `out/`: archive index (`index.tsv`), all action charts (`charts/`), English text (`loc_eng.json`) and other extracts.
-    These can be regenerated with `tools/`.
-- **Build and deploy:** these are the probe's commands. For the mod, replace `HorseProbe` with `HorseSteer` throughout:
-
-  ```bash
-  cmake -S src/HorseProbe -B build/HorseProbe -G "Visual Studio 17 2022" -A x64
-  cmake --build build/HorseProbe --config Release
-  cp build/HorseProbe/Release/HorseProbe.asi "E:/Tools/mods/crimson desert/DMM/mods/"
-  ```
-
-  The tester then enables it in DMM.

@@ -1,7 +1,7 @@
 # Horse backward walk
 
 S from standing walks the horse backward, as in RDR2. It's built into `HorseSteer` with no chart patch, and is limited to `CD_R0001_Horse`. Analysed on
-build 1.0.0.3479. Stage tests and results are in `horsesteer-test.md`, with logs in `scratch/probe-runs/stage5*/`.
+build 1.0.0.3479. Stage tests and results are in `../horsesteer-tests/`, with logs in `scratch/probe-runs/stage5*/`.
 
 ## How it works
 
