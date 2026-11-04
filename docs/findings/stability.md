@@ -4,12 +4,22 @@ Build 1.0.0.3479.
 
 ## Freeze after a won minigame
 
-The horse ignores input after a won minigame until a remount. It happens with both input hooks installed,
-even when they write nothing and without the rodeo stub, and doesn't happen with the hooks left out or `HorseSteer` disabled. Which
-hook causes it, and how, is unknown. No branch in the exe lands inside either hook's patched bytes. Logs are in
-`scratch/probe-runs/` (`f5-off-win`, `no-stub-win`, `no-hooks-win`).
+The horse ignores input after a won minigame until a remount. In every logged run, it froze when no W, A, S or D key was pressed between the last release of W and the end of the minigame's UI, and moved when one was. The hooks were first blamed because `no-hooks-win` moved and the runs with hooks froze, but that run also had keys down in the window, so the hooks aren't shown to be the cause, and the freeze may happen without the mod. Six runs is few, and other keys aren't logged. No branch in the exe lands inside either hook's patched bytes.
 
-One freeze has been logged with chart state, on Steam build 26423880 (`scratch/probe-runs/stage8/`). The mount's chart reached a state seen nowhere else in that run (`state` ending `372A9`, no `value`, velocity 0) about when the
+| Run in `scratch/probe-runs/` | Hooks | UI ended, seconds after mounting | Keys in the window | Horse after the UI |
+| --- | --- | --- | --- | --- |
+| `stage10`, first tame | Yes | 15.3 | A, S, D and W from 11.4 to 14.0 | Moved |
+| `no-hooks-win` | No | Not logged, 13.7 to 16.9 in the other runs | W from 13.8, D until 20.0 | Moved |
+| `stage10`, second tame | Yes | 16.9 | None: W released at 12.8, next W at 17.5 | Frozen |
+| `stage8` | Yes | 13.7 | None: W released at 10.2, next W at 14.7 | Frozen |
+| `f5-off-win` | Yes, mod off with F5 | 16.1 | None: W released at 13.9, next W at 17.2 | Frozen |
+| `no-stub-win` | Yes, no rodeo stub | Not logged | None: W released at 12.8, next W at 17.0 | Frozen |
+
+[Stage 10b](../horsesteer-tests/stage-10b.md) tamed one horse with no hooks and it moved, but the tester wasn't sure the keys were released in time, and that build logs no keys, so it doesn't settle whether the freeze happens without hooks.
+
+In `stage10`, both tames reached state `672A9`. The first left it for `62592` as the UI closed, and the second stayed in it until the dismount 11.5 s later, with keys reaching the stick values. S still moves the horse backward in that state, because the position writes don't depend on it.
+
+One earlier freeze has been logged with chart state, on Steam build 26423880 (`scratch/probe-runs/stage8/`). The mount's chart reached a state seen nowhere else in that run (`state` ending `372A9`, no `value`, velocity 0) about when the
 minigame ended, and stayed there for about 6 s until the dismount, with W held for about 3.5 s of that, and A and D for part of it. The keys did reach the stick values in both input slots, so the chart isn't leaving the state despite the input. The remount
 put it in `3A73F`, and normal states followed.
 

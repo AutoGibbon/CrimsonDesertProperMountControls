@@ -20,6 +20,8 @@
 #include <cstring>
 #include <cwchar>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "safetyhook.hpp"
 
@@ -27,25 +29,37 @@ namespace {
 
 constexpr const char* kVersion = "0.0.1";
 
-// Steam build 26423880.
-constexpr uint32_t kPeTimestamp = 0x6AEA07A6;
-constexpr uintptr_t kWorldSystemSlot = 0x71BDEF0;
-constexpr uintptr_t kChunkOrigin = 0x71AA150;
-constexpr uintptr_t kVtActorManager = 0x5944B38;
-constexpr uintptr_t kVtVehicleComponent = 0x5944B90;
-// Inside ClientInputActorComponent's update (exe+0xB6D470), right after it copies the camera vectors.
-constexpr uintptr_t kHookSite = 0xB6D526;
-constexpr uint8_t kHookSiteBytes[] = {0x49, 0x8B, 0x40, 0x20, 0x48, 0x8B, 0x88, 0x30, 0x12, 0x00, 0x00};
+// A code signature with ?? for bytes that vary, and the target's distance from its first byte, which must be literal.
+// tools/check_lookups.py runs the same lookups on saved exes, so change both together.
+struct Signature {
+    const char* text;
+    int distance;
+};
+
+// Inside ClientInputActorComponent's update, right after it copies the camera vectors to +0x154 and +0x160.
+constexpr Signature kHookSiteSignature{
+    "4C 8D B7 60 01 00 00 C5 F0 14 C0 C4 C1 7B 11 06 C4 C1 7A 11 5E 08 C5 FB 11 A7 54 01 00 00 89 8F 5C 01 00 00 "
+    "49 8B 40 20 48 8B 88 30 12 00 00 48 8B 99 90 00 00 00",
+    36};
 // In the same update, right before it reads the raw stick from +0x48.
-constexpr uintptr_t kStickSite = 0xB6D626;
-constexpr uint8_t kStickSiteBytes[] = {0x48, 0x8D, 0x77, 0x50, 0x48, 0x8B, 0x47, 0x48};
-// The chart's key condition check, which reads the key's hash from its condition.
-constexpr uintptr_t kKeyCheck = 0x3B0750;
+constexpr Signature kStickSiteSignature{
+    "FF 50 48 48 8B 08 48 89 4F 48 48 8D 77 50 48 8B 47 48 48 89 06 C5 FA 10 0E C5 FA 10 46 04", 10};
+// The chart's key condition check, which reads the key's hash from its condition. The signature starts 14 bytes in,
+// because another mod hooks the function's first bytes at runtime.
+constexpr Signature kKeyCheckSignature{
+    "48 8B 48 68 48 8B 81 B0 01 00 00 80 B8 79 01 00 00 00 75 ?? 48 8B 05 ?? ?? ?? ?? 48 8B 88 D8 00 00 00 "
+    "48 8B 41 20 83 78 28 00",
+    -14};
 constexpr uint8_t kKeyCheckBytes[] = {0x48, 0x83, 0xEC, 0x28, 0x48, 0x8B, 0x02, 0x8B, 0x50, 0x08};
-// UIGamePlayControlRootMiniGameRodeo's vtable, its first entry, which confirms the address, and the slot the game calls
-// every frame while the minigame is open and at no other time.
-constexpr uintptr_t kVtRodeoUi = 0x5A75218;
-constexpr uintptr_t kRodeoUiSlot0 = 0x11F09D0;
+// mov rax,[rip+x]; mov rcx,[rax+0x30], which loads the WorldSystem global far more often than any other global.
+constexpr const char* kWorldReferenceSignature = "48 8B 05 ?? ?? ?? ?? 48 8B 48 30";
+constexpr int kWorldMinRatio = 3;
+// Class names in RTTI for the vtables.
+constexpr const char* kClassActorManager = ".?AVClientActorManager@pa@@";
+constexpr const char* kClassVehicleComponent = ".?AVClientVehicleActorComponent@pa@@";
+constexpr const char* kClassRodeoUi = ".?AVUIGamePlayControlRootMiniGameRodeo@uiCommonScript@pa@@";
+// The slot of UIGamePlayControlRootMiniGameRodeo's vtable that the game calls every frame while the minigame is open and
+// at no other time.
 constexpr size_t kRodeoUiFrameSlot = 47;
 constexpr ULONGLONG kRodeoTimeoutMs = 250;
 
@@ -114,6 +128,14 @@ struct InputSample {
 FILE* g_log = nullptr;
 FILE* g_csv = nullptr;
 uintptr_t g_base = 0;
+// Offsets from g_base, set by RunLookups before the hooks are installed.
+uintptr_t g_worldSystemSlot = 0;
+uintptr_t g_vtActorManager = 0;
+uintptr_t g_vtVehicleComponent = 0;
+uintptr_t g_vtRodeoUi = 0;
+uintptr_t g_hookSite = 0;
+uintptr_t g_stickSite = 0;
+uintptr_t g_keyCheck = 0;
 std::atomic<bool> g_enabled{true};
 std::atomic<bool> g_flip{false};
 InputSample g_samples[2];
@@ -263,14 +285,14 @@ bool ReadVelocity(uintptr_t actor, float& x, float& z) {
 // Resolve the controlled actor, its mount through the vehicle component link, and the mount's facing.
 Ride ResolveRide() {
     Ride ride;
-    const uintptr_t world = ReadPtr(g_base + kWorldSystemSlot);
+    const uintptr_t world = ReadPtr(g_base + g_worldSystemSlot);
     const uintptr_t manager = world ? ReadPtr(world + 0x30) : 0;
-    if (!manager || !HasVtable(manager, kVtActorManager)) return ride;
+    if (!manager || !HasVtable(manager, g_vtActorManager)) return ride;
     ride.rider = ReadPtr(manager + 0x50);
     if (!ride.rider) return ride;
     const uintptr_t components = ReadPtr(ride.rider + 0x68);
     const uintptr_t vehicle = components ? ReadPtr(components + 0x48) : 0;
-    if (!vehicle || !HasVtable(vehicle, kVtVehicleComponent)) return ride;
+    if (!vehicle || !HasVtable(vehicle, g_vtVehicleComponent)) return ride;
     const uintptr_t link = ReadPtr(vehicle + 0x18);
     int8_t seat = -1;
     if (!link || !Read(link + 0x10, ride.mountKey) || ride.mountKey == 0) return ride;
@@ -493,11 +515,7 @@ void OnStickRead(SafetyHookContext& ctx) {
 // Replace the rodeo UI's per-frame vtable slot with a stub that counts the call and jumps to the original, leaving every
 // register except the flags untouched, so that RodeoActive can tell when the minigame is open.
 void InstallRodeoSwitch() {
-    const auto vtable = reinterpret_cast<uintptr_t*>(g_base + kVtRodeoUi);
-    if (vtable[0] != g_base + kRodeoUiSlot0) {
-        Log("rodeo switch: vtable differs, not installed");
-        return;
-    }
+    const auto vtable = reinterpret_cast<uintptr_t*>(g_base + g_vtRodeoUi);
     auto* stub = static_cast<uint8_t*>(VirtualAlloc(nullptr, 32, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
     if (!stub) {
         Log("rodeo switch: stub allocation failed");
@@ -521,7 +539,7 @@ void InstallRodeoSwitch() {
 
 // Log the key check's first bytes if they differ from the file's, which means something patched it at runtime.
 void LogKeyCheckBytes() {
-    const auto* live = reinterpret_cast<const uint8_t*>(g_base + kKeyCheck);
+    const auto* live = reinterpret_cast<const uint8_t*>(g_base + g_keyCheck);
     if (memcmp(live, kKeyCheckBytes, sizeof kKeyCheckBytes) == 0) {
         Log("key check bytes match the file");
         return;
@@ -532,7 +550,7 @@ void LogKeyCheckBytes() {
     if (live[0] == 0xE9) {
         int32_t offset = 0;
         memcpy(&offset, live + 1, sizeof offset);
-        const uintptr_t target = g_base + kKeyCheck + 5 + offset;
+        const uintptr_t target = g_base + g_keyCheck + 5 + offset;
         HMODULE owner = nullptr;
         wchar_t path[MAX_PATH] = L"unknown";
         if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -557,22 +575,20 @@ void WriteTelemetry(const Ride& ride) {
     static size_t rows = 0;
     if (!g_csv || rows > 500000) return;
 
-    Vec3 origin{}, riderAxis{}, riderPos{}, mountAxis{};
-    Read(g_base + kChunkOrigin, origin);
+    Vec3 riderAxis{}, riderPos{}, mountAxis{};
     const bool haveRider = ride.rider && ReadPhysics(ride.rider, riderAxis, &riderPos);
     const bool haveMount = ride.mount && ReadPhysics(ride.mount, mountAxis);
 
     const ULONGLONG now = GetTickCount64();
     float speed = kMissing, travelYaw = kMissing;
-    const Vec3 world{riderPos.x + origin.x, riderPos.y + origin.y, riderPos.z + origin.z};
     if (haveRider && lastTick != 0 && now > lastTick) {
         const float dt = static_cast<float>(now - lastTick) / 1000.0f;
-        const float dx = world.x - lastPos.x, dz = world.z - lastPos.z;
+        const float dx = riderPos.x - lastPos.x, dz = riderPos.z - lastPos.z;
         speed = std::hypot(dx, dz) / dt;
         if (speed > 0.1f) travelYaw = YawDeg(dx, dz);
     }
     if (haveRider) {
-        lastPos = world;
+        lastPos = riderPos;
         lastTick = now;
     }
 
@@ -592,7 +608,7 @@ void WriteTelemetry(const Ride& ride) {
     const bool haveVelocity = ride.mount && ReadVelocity(ride.mount, velX, velZ);
     fprintf(g_csv, ",%llX,%.3f,%.3f,%.3f,%.3f,%.2f", static_cast<unsigned long long>(chartState), chartValue,
             haveVelocity ? velX : kMissing, haveVelocity ? velZ : kMissing,
-            haveVelocity ? std::hypot(velX, velZ) : kMissing, haveRider ? world.y : kMissing);
+            haveVelocity ? std::hypot(velX, velZ) : kMissing, haveRider ? riderPos.y : kMissing);
     fputc('\n', g_csv);
     ++rows;
     if (now - lastFlush > 1000) {
@@ -617,32 +633,228 @@ std::wstring ModuleDir(HMODULE module) {
     return slash == std::wstring::npos ? L"." : dir.substr(0, slash);
 }
 
-bool InstallHook() {
+const IMAGE_NT_HEADERS* GameHeaders() {
     const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(g_base);
-    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(g_base + dos->e_lfanew);
+    return reinterpret_cast<const IMAGE_NT_HEADERS*>(g_base + dos->e_lfanew);
+}
+
+// Which of the game's sections to scan. Section names change between builds, so these go by the section's flags.
+enum class SectionKind { Code, Data, ReadOnlyData };
+
+bool SectionIs(const IMAGE_SECTION_HEADER& section, SectionKind kind) {
+    const bool exec = (section.Characteristics & IMAGE_SCN_MEM_EXECUTE) != 0;
+    const bool write = (section.Characteristics & IMAGE_SCN_MEM_WRITE) != 0;
+    switch (kind) {
+        case SectionKind::Code: return exec;
+        case SectionKind::Data: return !exec;
+        case SectionKind::ReadOnlyData: return !exec && !write;
+    }
+    return false;
+}
+
+struct Range {
+    const uint8_t* first = nullptr;
+    const uint8_t* last = nullptr;
+};
+
+// Return the readable parts of the game's sections of the given kind, joining adjacent regions so that a match can span
+// them.
+std::vector<Range> ReadableRanges(SectionKind kind) {
+    constexpr DWORD kReadable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ |
+                                PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+    std::vector<Range> ranges;
+    const IMAGE_NT_HEADERS* nt = GameHeaders();
+    const IMAGE_SECTION_HEADER* section = IMAGE_FIRST_SECTION(nt);
+    for (WORD i = 0; i < nt->FileHeader.NumberOfSections; ++i, ++section) {
+        if (!SectionIs(*section, kind)) continue;
+        const auto* p = reinterpret_cast<const uint8_t*>(g_base + section->VirtualAddress);
+        const uint8_t* const end = p + section->Misc.VirtualSize;
+        while (p < end) {
+            MEMORY_BASIC_INFORMATION info;
+            if (!VirtualQuery(p, &info, sizeof info)) break;
+            const uint8_t* const regionEnd =
+                std::min(static_cast<const uint8_t*>(info.BaseAddress) + info.RegionSize, end);
+            if (info.State == MEM_COMMIT && (info.Protect & kReadable) && !(info.Protect & PAGE_GUARD)) {
+                if (!ranges.empty() && ranges.back().last == p) {
+                    ranges.back().last = regionEnd;
+                } else {
+                    ranges.push_back({p, regionEnd});
+                }
+            }
+            p = regionEnd;
+        }
+    }
+    return ranges;
+}
+
+// Bytes to search for. literal[i] is 0 where bytes[i] can be anything.
+struct Pattern {
+    std::vector<uint8_t> bytes;
+    std::vector<uint8_t> literal;
+};
+
+Pattern ParseSignature(const char* text) {
+    Pattern pattern;
+    for (const char* p = text; *p;) {
+        if (*p == ' ') {
+            ++p;
+            continue;
+        }
+        const bool wildcard = *p == '?';
+        pattern.bytes.push_back(wildcard ? 0 : static_cast<uint8_t>(strtoul(std::string(p, 2).c_str(), nullptr, 16)));
+        pattern.literal.push_back(wildcard ? 0 : 1);
+        p += 2;
+    }
+    return pattern;
+}
+
+Pattern LiteralPattern(const void* data, size_t size) {
+    const auto* bytes = static_cast<const uint8_t*>(data);
+    return {std::vector<uint8_t>(bytes, bytes + size), std::vector<uint8_t>(size, 1)};
+}
+
+// Append the address of every match in range to hits, and return false if reading faults.
+bool ScanRange(const Range& range, const Pattern& pattern, std::vector<uintptr_t>& hits) {
+    const size_t size = pattern.bytes.size();
+    if (static_cast<size_t>(range.last - range.first) < size) return true;
+    const uint8_t* const last = range.last - size;
+    const uint8_t first = pattern.bytes[0];
+    __try {
+        for (const uint8_t* p = range.first; p <= last; ++p) {
+            p = static_cast<const uint8_t*>(memchr(p, first, static_cast<size_t>(last - p) + 1));
+            if (!p) break;
+            size_t i = 1;
+            while (i < size && (!pattern.literal[i] || p[i] == pattern.bytes[i])) ++i;
+            if (i == size) hits.push_back(reinterpret_cast<uintptr_t>(p));
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+    return true;
+}
+
+// Return the offset from g_base of every match in the game's sections of the given kind, or nothing if reading faults.
+std::vector<uintptr_t> FindAll(const Pattern& pattern, SectionKind kind) {
+    std::vector<uintptr_t> hits;
+    for (const Range& range : ReadableRanges(kind)) {
+        if (!ScanRange(range, pattern, hits)) {
+            Log("lookup scan: read fault in %p to %p", range.first, range.last);
+            return {};
+        }
+    }
+    for (uintptr_t& hit : hits) hit -= g_base;
+    return hits;
+}
+
+// Return the offsets of the vtables for the primary base of the class with this RTTI name.
+std::vector<uintptr_t> FindVtables(const char* className) {
+    std::vector<uintptr_t> vtables;
+    const std::vector<uintptr_t> names = FindAll(LiteralPattern(className, strlen(className) + 1), SectionKind::Data);
+    if (names.empty()) return vtables;
+    const auto descriptor = static_cast<uint32_t>(names[0] - 0x10);
+    for (const uintptr_t field : FindAll(LiteralPattern(&descriptor, sizeof descriptor), SectionKind::ReadOnlyData)) {
+        // A CompleteObjectLocator has signature 1 at +0, offset 0 at +4 for the primary base, the type descriptor at +12
+        // and its own offset at +20. A vtable's entry -1 points to it.
+        const uintptr_t locator = field - 12;
+        uint32_t signature = 0, offset = 1, self = 0;
+        if (!Read(g_base + locator, signature) || !Read(g_base + locator + 4, offset) ||
+            !Read(g_base + locator + 20, self) || signature != 1 || offset != 0 || self != locator) {
+            continue;
+        }
+        const uintptr_t pointer = g_base + locator;
+        for (const uintptr_t hit : FindAll(LiteralPattern(&pointer, sizeof pointer), SectionKind::ReadOnlyData)) {
+            vtables.push_back(hit + sizeof(uintptr_t));
+        }
+    }
+    return vtables;
+}
+
+// Set out to the vtable of the class with this RTTI name and log the result. Return whether it has exactly one.
+bool LookupVtable(const char* name, const char* className, uintptr_t& out) {
+    const std::vector<uintptr_t> vtables = FindVtables(className);
+    if (vtables.size() != 1) {
+        Log("lookup %s FAILED: %zu vtables for %s", name, vtables.size(), className);
+        return false;
+    }
+    out = vtables[0];
+    Log("lookup %s: exe+0x%llX", name, static_cast<unsigned long long>(out));
+    return true;
+}
+
+// Set out to the signature's target and log the result. Return whether the signature has exactly one match.
+bool LookupSignature(const char* name, const Signature& signature, uintptr_t& out) {
+    const std::vector<uintptr_t> hits = FindAll(ParseSignature(signature.text), SectionKind::Code);
+    if (hits.size() != 1) {
+        Log("lookup %s FAILED: %zu signature matches", name, hits.size());
+        return false;
+    }
+    out = hits[0] + signature.distance;
+    Log("lookup %s: exe+0x%llX", name, static_cast<unsigned long long>(out));
+    return true;
+}
+
+// Set g_worldSystemSlot to the global that kWorldReferenceSignature loads most, and log the result. Return false unless
+// it has at least kWorldMinRatio times the references of the next.
+bool LookupWorldSystemSlot() {
+    std::unordered_map<uintptr_t, int> counts;
+    for (const uintptr_t hit : FindAll(ParseSignature(kWorldReferenceSignature), SectionKind::Code)) {
+        int32_t displacement = 0;
+        if (Read(g_base + hit + 3, displacement)) ++counts[hit + 7 + displacement];
+    }
+    uintptr_t slot = 0;
+    int top = 0, next = 0;
+    for (const auto& [address, count] : counts) {
+        if (count > top) {
+            next = top;
+            top = count;
+            slot = address;
+        } else if (count > next) {
+            next = count;
+        }
+    }
+    if (top == 0 || top < kWorldMinRatio * next) {
+        Log("lookup worldSystemSlot FAILED: %d references, next %d", top, next);
+        return false;
+    }
+    g_worldSystemSlot = slot;
+    Log("lookup worldSystemSlot: exe+0x%llX, %d references, next %d", static_cast<unsigned long long>(slot), top, next);
+    return true;
+}
+
+// Run every lookup and log each result. Return whether the mod can run, which needs all of them except the key check,
+// because that one is only diagnostics.
+bool RunLookups() {
+    const ULONGLONG start = GetTickCount64();
+    bool ok = LookupVtable("vtActorManager", kClassActorManager, g_vtActorManager);
+    ok &= LookupVtable("vtVehicleComponent", kClassVehicleComponent, g_vtVehicleComponent);
+    ok &= LookupVtable("vtRodeoUi", kClassRodeoUi, g_vtRodeoUi);
+    ok &= LookupWorldSystemSlot();
+    ok &= LookupSignature("hookSite", kHookSiteSignature, g_hookSite);
+    ok &= LookupSignature("stickSite", kStickSiteSignature, g_stickSite);
+    LookupSignature("keyCheck", kKeyCheckSignature, g_keyCheck);
+    Log("lookups took %llu ms", GetTickCount64() - start);
+    return ok;
+}
+
+bool InstallHook() {
     Log("HorseSteer %s loaded: base %p, PE timestamp 0x%08X", kVersion, reinterpret_cast<void*>(g_base),
-        nt->FileHeader.TimeDateStamp);
-    if (nt->FileHeader.TimeDateStamp != kPeTimestamp) {
-        Log("unsupported game build: hook not installed");
+        GameHeaders()->FileHeader.TimeDateStamp);
+    if (!RunLookups()) {
+        Log("a required lookup failed: hooks not installed, mod idle");
         return false;
     }
-    if (memcmp(reinterpret_cast<const void*>(g_base + kHookSite), kHookSiteBytes, sizeof kHookSiteBytes) != 0 ||
-        memcmp(reinterpret_cast<const void*>(g_base + kStickSite), kStickSiteBytes, sizeof kStickSiteBytes) != 0) {
-        Log("hook site bytes differ, possibly another mod's hook: hooks not installed");
-        return false;
-    }
-    auto hook =safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + kHookSite), OnInputUpdate);
-    auto stickHook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + kStickSite), OnStickRead);
+    auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + g_hookSite), OnInputUpdate);
+    auto stickHook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + g_stickSite), OnStickRead);
     if (!hook || !stickHook) {
         Log("hooks failed to install");
         return false;
     }
     g_hook = std::move(*hook);
     g_stickHook = std::move(*stickHook);
-    Log("hooks installed at exe+0x%llX and exe+0x%llX", static_cast<unsigned long long>(kHookSite),
-        static_cast<unsigned long long>(kStickSite));
+    Log("hooks installed at exe+0x%llX and exe+0x%llX", static_cast<unsigned long long>(g_hookSite),
+        static_cast<unsigned long long>(g_stickSite));
     InstallRodeoSwitch();
-    LogKeyCheckBytes();
+    if (g_keyCheck) LogKeyCheckBytes();
     return true;
 }
 
