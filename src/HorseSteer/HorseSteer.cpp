@@ -27,25 +27,25 @@ namespace {
 
 constexpr const char* kVersion = "0.0.1";
 
-// Build 1.0.0.3479.
-constexpr uint32_t kPeTimestamp = 0x6AE6E3E8;
-constexpr uintptr_t kWorldSystemSlot = 0x71B6C50;
-constexpr uintptr_t kChunkOrigin = 0x71A2EB0;
-constexpr uintptr_t kVtActorManager = 0x593ECF0;
-constexpr uintptr_t kVtVehicleComponent = 0x593E9D8;
-// Inside ClientInputActorComponent's update (exe+0xB6C3F0), right after it copies the camera vectors.
-constexpr uintptr_t kHookSite = 0xB6C4A6;
+// Steam build 26423880.
+constexpr uint32_t kPeTimestamp = 0x6AEA07A6;
+constexpr uintptr_t kWorldSystemSlot = 0x71BDEF0;
+constexpr uintptr_t kChunkOrigin = 0x71AA150;
+constexpr uintptr_t kVtActorManager = 0x5944B38;
+constexpr uintptr_t kVtVehicleComponent = 0x5944B90;
+// Inside ClientInputActorComponent's update (exe+0xB6D470), right after it copies the camera vectors.
+constexpr uintptr_t kHookSite = 0xB6D526;
 constexpr uint8_t kHookSiteBytes[] = {0x49, 0x8B, 0x40, 0x20, 0x48, 0x8B, 0x88, 0x30, 0x12, 0x00, 0x00};
 // In the same update, right before it reads the raw stick from +0x48.
-constexpr uintptr_t kStickSite = 0xB6C5A6;
+constexpr uintptr_t kStickSite = 0xB6D626;
 constexpr uint8_t kStickSiteBytes[] = {0x48, 0x8D, 0x77, 0x50, 0x48, 0x8B, 0x47, 0x48};
 // The chart's key condition check, which reads the key's hash from its condition.
-constexpr uintptr_t kKeyCheck = 0x3B0150;
+constexpr uintptr_t kKeyCheck = 0x3B0750;
 constexpr uint8_t kKeyCheckBytes[] = {0x48, 0x83, 0xEC, 0x28, 0x48, 0x8B, 0x02, 0x8B, 0x50, 0x08};
 // UIGamePlayControlRootMiniGameRodeo's vtable, its first entry, which confirms the address, and the slot the game calls
 // every frame while the minigame is open and at no other time.
-constexpr uintptr_t kVtRodeoUi = 0x5A6CBF8;
-constexpr uintptr_t kRodeoUiSlot0 = 0x11EF6B0;
+constexpr uintptr_t kVtRodeoUi = 0x5A75218;
+constexpr uintptr_t kRodeoUiSlot0 = 0x11F09D0;
 constexpr size_t kRodeoUiFrameSlot = 47;
 constexpr ULONGLONG kRodeoTimeoutMs = 250;
 

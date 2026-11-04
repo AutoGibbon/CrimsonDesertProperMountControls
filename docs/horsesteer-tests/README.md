@@ -29,4 +29,5 @@ steady while `i0_camera_yaw` changes, and `travel_yaw` is about 180° from `moun
 | [stage-5j](stage-5j.md) | Slow down first, then start | Works from all gaits. Steering in reverse looked clunky |
 | [stage-5k](stage-5k.md) | Later start, smaller reverse steering | Good |
 | [stage-6](stage-6.md) | Final backward walk (v0.0.1) | Passed. Taming minigame and other mounts not tested |
+| [stage-7](stage-7.md) | New addresses after the game patch | Passed. Taming minigame not tested |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

@@ -1,6 +1,6 @@
 # Offsets and addresses
 
-Build 1.0.0.3479, PE timestamp `0x6AE6E3E8`. All values are offsets from the image base unless shown as a field of a chain. What they
+Steam build 26423880, PE timestamp `0x6AEA07A6`. All values are offsets from the image base unless shown as a field of a chain. What they
 do is explained in the topic files.
 
 After a game update, the PE timestamp won't match. Check [CrimsonDesertCoop](https://github.com/macauleywilliams96-dotcom/CrimsonDesertCoop)
@@ -9,16 +9,18 @@ for new offsets, or port them with its `PORTING-3479.md` method using `scratch/e
 
 ## Used by `HorseSteer` and working in game
 
+[stage-7](../horsesteer-tests/stage-7.md) tested these on this build, apart from the rodeo slot, which needs the taming minigame.
+
 | Name in `HorseSteer.cpp` | Address | What it is |
 | --- | --- | --- |
-| `kWorldSystemSlot` | `0x71B6C50` | WorldSystem global |
-| `kChunkOrigin` | `0x71A2EB0` | Chunk origin |
-| `kVtActorManager` | `0x593ECF0` | `ClientActorManager` vtable, checked before use |
-| `kVtVehicleComponent` | `0x593E9D8` | `ClientVehicleActorComponent` vtable |
-| `kHookSite` | `0xB6C4A6` | Input update, right after the camera vectors are copied |
-| `kStickSite` | `0xB6C5A6` | Input update, right before the raw stick is read from `+0x48` |
-| `kKeyCheck` | `0x3B0150` | Chart key condition handler, type `0xEA`. Only logged at startup, to detect runtime patches |
-| `kVtRodeoUi` | `0x5A6CBF8` | `UIGamePlayControlRootMiniGameRodeo` vtable; slot 0 is `0x11EF6B0`, slot 47 runs each frame of the minigame |
+| `kWorldSystemSlot` | `0x71BDEF0` | WorldSystem global |
+| `kChunkOrigin` | `0x71AA150` | Chunk origin |
+| `kVtActorManager` | `0x5944B38` | `ClientActorManager` vtable, checked before use |
+| `kVtVehicleComponent` | `0x5944B90` | `ClientVehicleActorComponent` vtable |
+| `kHookSite` | `0xB6D526` | Input update, right after the camera vectors are copied |
+| `kStickSite` | `0xB6D626` | Input update, right before the raw stick is read from `+0x48` |
+| `kKeyCheck` | `0x3B0750` | Chart key condition handler, type `0xEA`. Only logged at startup, to detect runtime patches |
+| `kVtRodeoUi` | `0x5A75218` | `UIGamePlayControlRootMiniGameRodeo` vtable; slot 0 is `0x11F09D0`, slot 47 runs each frame of the minigame |
 
 ```text
 manager    = [[kWorldSystemSlot]+0x30]               rider = [manager+0x50]
@@ -36,9 +38,9 @@ camera     = [[WorldSystem+0x18]+0x50]               the block the update copies
 
 ## Traced in the exe
 
-- **`ClientInputActorComponent`:** vtable `0x59504A0`, update at slot 33, `exe+0xB6C3F0`. Angle calculation at `exe+0xB6BD30`.
-- **Input state:** updated by `exe+0x30AE1C0`, with the previous vector at `+0x38` and current at `+0x40`.
-- **`RideOn::Enter`:** `exe+0x74F270`.
+- **`ClientInputActorComponent`:** vtable `0x59564C0`, update at slot 33, `exe+0xB6D470`. Angle calculation at `exe+0xB6CDB0`.
+- **Input state:** updated by `exe+0x30B3B50`, with the previous vector at `+0x38` and current at `+0x40`.
+- **`RideOn::Enter`:** `exe+0x74FBB0`.
 - **From other projects, not yet checked on this install:**
   - The image base is fixed at `0x140000000`, and part of the code is mutated by Denuvo, so some functions may only be
     readable in live memory (CrimsonDesertCoop).
@@ -53,9 +55,10 @@ key hash are in [charts-and-braking.md](charts-and-braking.md).
 
 Checked against this build's exe:
 
-- **Vtable:** RTTI finds `NormalMovementMethod`'s vtable at `exe+0x5952BF8`. Slots 4, 5 and 6 are all the empty stub `exe+0x3A2E50`.
-- **World global:** counting references to `mov rax,[rip+x]; mov rcx,[rax+0x30]` in code gives `kWorldSystemSlot` with 203 references, against 21 for the next.
-- **Chart runtime path:** the code at `exe+0xBC5AB8` reads `control = [[actor+0x68]+0x40]`, `index = byte [[control+0x30]+0x1B]` and `runtime = [[control+index*8+0x88]+0x18]`.
+- **Vtable:** RTTI finds `NormalMovementMethod`'s vtable at `exe+0x5958C10`. Slots 4, 5 and 6 are all the empty stub `exe+0x3A3450`.
+- **World global:** counting references to `mov rax,[rip+x]; mov rcx,[rax+0x30]` in code gives `kWorldSystemSlot` with 204 references, against 21 for the next.
+- **Key query:** the signature has one match, `exe+0x30CAFD0`.
+- **Chart runtime path:** the code at `exe+0xBC6B38` reads `control = [[actor+0x68]+0x40]`, `index = byte [[control+0x30]+0x1B]` and `runtime = [[control+index*8+0x88]+0x18]`.
 
 From the mod only, unconfirmed:
 
