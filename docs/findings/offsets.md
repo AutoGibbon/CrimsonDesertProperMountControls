@@ -3,6 +3,10 @@
 Build 1.0.0.3479, PE timestamp `0x6AE6E3E8`. All values are offsets from the image base unless shown as a field of a chain. What they
 do is explained in the topic files.
 
+After a game update, the PE timestamp won't match. Check [CrimsonDesertCoop](https://github.com/macauleywilliams96-dotcom/CrimsonDesertCoop)
+for new offsets, or port them with its `PORTING-3479.md` method using `scratch/exe-baseline/`. To re-derive the camera slot, use
+`docs/ENGINE_CAMERA_RESEARCH.md` from CrimsonDesertTelemetry.
+
 ## Used by `HorseSteer` and working in game
 
 | Name in `HorseSteer.cpp` | Address | What it is |
@@ -13,7 +17,7 @@ do is explained in the topic files.
 | `kVtVehicleComponent` | `0x593E9D8` | `ClientVehicleActorComponent` vtable |
 | `kHookSite` | `0xB6C4A6` | Input update, right after the camera vectors are copied |
 | `kStickSite` | `0xB6C5A6` | Input update, right before the raw stick is read from `+0x48` |
-| `kKeyCheck` | `0x3B0150` | Chart key condition handler, type `0xEA` |
+| `kKeyCheck` | `0x3B0150` | Chart key condition handler, type `0xEA`. Only logged at startup, to detect runtime patches |
 | `kVtRodeoUi` | `0x5A6CBF8` | `UIGamePlayControlRootMiniGameRodeo` vtable; slot 0 is `0x11EF6B0`, slot 47 runs each frame of the minigame |
 
 ```text
@@ -35,10 +39,6 @@ camera     = [[WorldSystem+0x18]+0x50]               the block the update copies
 - **`ClientInputActorComponent`:** vtable `0x59504A0`, update at slot 33, `exe+0xB6C3F0`. Angle calculation at `exe+0xB6BD30`.
 - **Input state:** updated by `exe+0x30AE1C0`, with the previous vector at `+0x38` and current at `+0x40`.
 - **`RideOn::Enter`:** `exe+0x74F270`.
-- **Published vtables:** `ClientActorManager`, `ClientChildOnlyInGameActor` and
-  `ClientCharacterControlActorComponent` resolve through RTTI at their published addresses in this exe. The published
-  camera and physics vtable addresses do not, so `HorseProbe` checks the camera with its block sentinel instead.
-- **Failed telemetry:** the published camera slot's sentinel never matched in HorseProbe run 1.
 - **From other projects, not yet checked on this install:**
   - The image base is fixed at `0x140000000`, and part of the code is mutated by Denuvo, so some functions may only be
     readable in live memory (CrimsonDesertCoop).

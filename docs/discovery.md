@@ -12,7 +12,7 @@ Replicate Red Dead Redemption 2's horse-relative controls, through a native ASI 
 ## Requirements
 
 - **Forward/back:** W moves the horse along its own facing. S from standing walks the horse backward, as in RDR2. S is not a brake or a drift trigger: the tester dropped both, because players press
-  S while riding to turn, which would start unwanted drifts, and it makes escaping a drift harder.
+  S while riding to turn, which would start unwanted drifts, and it makes escaping a drift harder. Alt still brakes and drifts as in the base game.
 - **Steering:** A and D change the horse's heading while held. With no other input the horse walks in a small radius,
   and releasing W while steering at speed gives a tighter turn. The user wants to keep both behaviours.
 - **Pivot:** S with A or D turns the horse nearly on the spot, at about 52°/s and 0.5 m/s, and the user wants to keep it.
@@ -31,15 +31,11 @@ Replicate Red Dead Redemption 2's horse-relative controls, through a native ASI 
 camera forward and right vectors with ones aligned to the mount. The game's own angle calculation then resolves WASD
 against the mount's facing, so the camera stays free. Test status is in `docs/horsesteer-tests/README.md`.
 
-| Unknown | Status |
-| --- | --- |
-| Forward, steering and free look | Working at walk, trot and gallop, tested in game |
-| Brake on S | Dropped and removed after stage 5. Alt still brakes and drifts as in the base game |
-| Backward walk | Working in game on the horse, in v0.0.1 (stage 6). The ASI moves the horse backward through its physics position, which plays the game's own blended backward walk. Other mounts are next. See `findings/backward-walk.md` |
-| Drift recovery | Not a confirmed problem. The tester saw rougher recovery in stage 5 and suspects needing S to start the drift made the escape inputs harder. Removing S as the trigger should remove that factor; recheck only if it's still noticed with Alt |
-| Taming minigame | Working in game: the mod pauses while the rodeo UI's frame slot is being called. Known issue: the horse ignores input after a win until the rider dismounts and remounts |
-| Mount check | The action package name at `[[[[mount+0x68]+0x40]+0x28]+0x18]+0x48` must be in the land-mount list in `HorseSteer.cpp`. Working on the horse in game; other mounts are untested and use their own charts. `CD_M0003_CucuBird` is included; it has gliding states that are untested |
-| Game camera follow and lookahead on | Not tested; the game hit a GPU reset when they were turned back on |
+Open points:
+
+- **Drift recovery:** not a confirmed problem. The tester saw rougher recovery in stage 5 and suspects needing S to start the drift made the escape inputs harder. Removing S as the trigger should remove that factor; recheck only if it's still noticed with Alt.
+- **Mount check:** the action package name must be in `kGroundMountPackages`. It works on the horse in game; other mounts are untested and use their own charts. `CD_M0003_CucuBird` is included, and its gliding states are untested.
+- **Game camera follow and lookahead:** stage 1 ran with both off, and steering with them on is untested. The game itself runs normally with them on.
 
 The game setting and camera preset routes are ruled out: both work by keeping the camera behind the horse, which breaks
 free look. No existing mod does this: the user searched Nexus and found none that do anything like this, and GitHub and web

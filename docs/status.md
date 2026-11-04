@@ -3,7 +3,7 @@
 Where the mod stands and what to do next. Requirements are in [discovery.md](discovery.md) and evidence is in [findings/](findings/).
 
 **Status:** `src/HorseSteer` is the working mod, and v0.0.1 is the working horse prototype. Forward steering and free look work at walk, trot and gallop, S with A or D pivots, and S alone
-walks the horse backward. The "Minimal mod" section in `horseprobe/analysis.md` is superseded, because the mod replaces the camera vectors rather than the stick.
+walks the horse backward. The mod pauses during the taming minigame.
 
 ## Next
 

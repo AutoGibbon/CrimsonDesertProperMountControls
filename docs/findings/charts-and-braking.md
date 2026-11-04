@@ -24,15 +24,11 @@ the slide and drift states, and its skill conditions, with conditions decoded.
   The tester reports that brake with A or D drifts in game, quickly slowing the horse and turning it to that side.
 - **`key_brake` on other mounts:** of the land-mount ride charts, only the wolf and warthog read it, in one walk branch each,
   `OR T10 key_brake`. The bear, camel, reindeer, elephant, iguana, Carma bird and cucu bird ride charts don't read it.
-- **Stage 5 S brake (`scratch/probe-runs/stage5-brake/`):** speeds are noisy, and each comparison below has few samples.
-  - **S alone:** 8.1 m/s to under 1 m/s in 2.3 s, against 2.3 s from 7.1 m/s for one clean W release. From 13.2 m/s, it reached
-    1.4 m/s in 3.2 s. The tester saw no difference from releasing W, and no slide without steering.
-  - **S with A or D:** at 13–15 m/s the horse turned at 110–200°/s on average during the press, and the tester saw a drift. At
-    11–12 m/s it turned at 70–85°/s with no drift.
-  - **Standing:** S does nothing, and S with D pivoted at about 50°/s and 0.4 m/s.
-  - **Drift recovery:** many drifts fall to about 0 m/s within 2 s, then reach about 10 m/s by 6 s, even with W held. Speed fell
-    below 3 m/s within 5 s in 6 of 17 Alt drifts with the mod on and 1 of 7 with it off, with W held about as long in both. It also
-    did in 6 of 8 S drifts, but W was held for less of those. The cause is untraced.
+- **Brake on S (stage 5, dropped, `scratch/probe-runs/stage5-brake/`):** few noisy samples. S alone felt the same as releasing W. With
+  the brake answered on S, S with A or D drifted at 13–15 m/s, and turned at 70–85°/s with no drift at 11–12 m/s.
+- **Drift recovery:** many drifts fall to about 0 m/s within 2 s, then reach about 10 m/s by 6 s, even with W held. Speed fell
+  below 3 m/s within 5 s in 6 of 17 Alt drifts with the mod on and 1 of 7 with it off, with W held about as long in both. The cause is
+  untraced.
 
 ## Reading and overriding keys
 
@@ -48,7 +44,7 @@ the slide and drift states, and its skill conditions, with conditions decoded.
 - **Key query (Horse Tap Brake, checked against this build's exe):** the signature has one match, `exe+0x30C5640`, which takes a
   key hash and returns true if the key is held. It's slot 8 of the input object's vtable. That object comes from the first entry
   of the list at `[[WorldSystem+0xD8]+0x20]` (count at `+0x28`), then `+0x10`.
-- **Key hash (Horse Tap Brake, checked against this build's exe):** Jenkins lookup3 with seed `0xC5EDE` on the lowercase name.
-  `key_brake` gives `0x377B9DB8`, as logged in earlier tests. The mod overrides the result of the slot 8 call to hold a key, so the
+- **Key hash (Horse Tap Brake, checked against this build's exe):** Jenkins lookup3 with seed `0xC5EDE` on the lowercase name,
+  which reproduces the `key_brake` hash above. The mod overrides the result of the slot 8 call to hold a key, so the
   `0xEA` handler table doesn't need patching. This only covers actions read through that query, so it can't replace the stick
   changes. Nothing here has been tested in game with `HorseSteer`.

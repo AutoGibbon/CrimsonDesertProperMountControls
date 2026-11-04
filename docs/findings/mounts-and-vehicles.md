@@ -11,8 +11,7 @@ Build 1.0.0.3479. How the horse's backward walk works, and how to check it on ot
 
 ## From probe and test runs
 
-- **Mount link:** rider `[[actor+0x68]+0x48]` is the `ClientVehicleActorComponent` (vtable `0x593E9D8`). Its `[+0x18]+0x10`
-  is the mount key and `+0x14` the seat, as `RideOn::Enter` (`exe+0x74F270`) reads them.
+- **Mount link:** the rider's `ClientVehicleActorComponent` holds the mount key and seat, which `RideOn::Enter` reads the same way.
 - **Mount key:** this save's horse key is `0xB0100002`. Key `0xB0100003`, from captures on build 2976, was not found.
 - **Mount scan:** the horse's action package name is `CD_R0001_Horse`. Its appearance path is at a different chain from the protagonists'.
   The scan was removed from `HorseSteer`; its output is in `scratch/probe-runs/steer5/` and the last version with it is not committed.
@@ -40,5 +39,3 @@ Build 1.0.0.3479. How the horse's backward walk works, and how to check it on ot
 
 - **Other movement classes (Horse Tap Brake):** the exe has `VehicleMovementMethod`, `DriverMovementMethod`, `RideOnMovementMethod`, `RideOffMovementMethod` and `MiniGameMovementMethod`.
   These are names only, not traced.
-- **From CrimsonDesertCoop, build 2976, not checked on this install:** while riding, the horse's world transform travels in the rider's `MoveActorReq`, and the horse sends its own only
-  about once per second.

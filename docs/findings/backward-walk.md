@@ -24,8 +24,7 @@ build 1.0.0.3479. Stage tests and results are in `../horsesteer-tests/`, with lo
 - At a wall, the horse backs in until the rider's collider stops it, so its rear goes into the wall.
 - From a walk, trot or gallop, the walk starts after about 1.7, 3.4 or 4.2 s, because the horse stops first. The start can jitter slightly.
 - A or D first from standing depends on the state the horse last left: a forward tight turn after moving forward, or a pivot after reversing or mounting.
-- The walk is limited to the horse for now. Other land mounts have their own charts and are untested. Next, check whether the same technique works on the mounts in
-  `kGroundMountPackages`: which blend files have backward clips, and which stop states hold while the mount keeps moving.
+- The walk is limited to the horse for now. Other land mounts have their own charts and are untested.
 
 ## What didn't work
 
