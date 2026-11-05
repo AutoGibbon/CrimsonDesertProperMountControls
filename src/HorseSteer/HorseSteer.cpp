@@ -144,6 +144,8 @@ struct InputSample {
 };
 
 FILE* g_log = nullptr;
+std::wstring g_logPath;
+bool g_logging = false;
 FILE* g_csv = nullptr;
 uintptr_t g_base = 0;
 // Offsets from g_base, set by RunLookups before the hooks are installed.
@@ -170,16 +172,45 @@ std::atomic<ULONGLONG> g_backwardPulseEnd{0};
 std::atomic<bool> g_backwardWanted{false};
 std::atomic<bool> g_backwardWalking{false};
 
-void Log(const char* fmt, ...) {
+const IMAGE_NT_HEADERS* GameHeaders();
+
+// Write one timestamped line to g_log, if it's open.
+void WriteLogLine(const char* fmt, va_list args) {
     if (!g_log) return;
-    va_list args;
-    va_start(args, fmt);
     SYSTEMTIME t;
     GetLocalTime(&t);
     fprintf(g_log, "[%02d:%02d:%02d.%03d] ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
     vfprintf(g_log, fmt, args);
     fputc('\n', g_log);
     fflush(g_log);
+}
+
+// Create g_log at g_logPath if it isn't open yet, starting with the mod's version and the game's PE timestamp.
+void OpenLog() {
+    if (g_log) return;
+    g_log = _wfsopen(g_logPath.c_str(), L"w", _SH_DENYNO);
+    if (!g_log) return;
+    fprintf(g_log, "HorseSteer %s, base %p, PE timestamp 0x%08X\n", kVersion, reinterpret_cast<void*>(g_base),
+            GameHeaders()->FileHeader.TimeDateStamp);
+    fflush(g_log);
+}
+
+// Write a tracing line, only when Logging is on in the ini.
+void Log(const char* fmt, ...) {
+    if (!g_logging) return;
+    va_list args;
+    va_start(args, fmt);
+    WriteLogLine(fmt, args);
+    va_end(args);
+}
+
+// Write a line about something that stops the mod or part of it working, whatever Logging is set to. Only call this from
+// ModThread, because it can create the log.
+void LogProblem(const char* fmt, ...) {
+    OpenLog();
+    va_list args;
+    va_start(args, fmt);
+    WriteLogLine(fmt, args);
     va_end(args);
 }
 
@@ -593,7 +624,7 @@ void InstallRodeoSwitch() {
     const auto vtable = reinterpret_cast<uintptr_t*>(g_base + g_vtRodeoUi);
     auto* stub = static_cast<uint8_t*>(VirtualAlloc(nullptr, 32, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
     if (!stub) {
-        Log("rodeo switch: stub allocation failed");
+        LogProblem("rodeo switch: stub allocation failed, so the mod won't pause for the taming minigame");
         return;
     }
     // lock inc qword ptr [rip+8]; jmp qword ptr [rip+10]; the counter is at +16 and the original address at +24.
@@ -603,7 +634,7 @@ void InstallRodeoSwitch() {
     FlushInstructionCache(GetCurrentProcess(), stub, 32);
     DWORD oldProtect = 0;
     if (!VirtualProtect(&vtable[kRodeoUiFrameSlot], sizeof(uintptr_t), PAGE_READWRITE, &oldProtect)) {
-        Log("rodeo switch: vtable protection failed");
+        LogProblem("rodeo switch: vtable protection failed, so the mod won't pause for the taming minigame");
         return;
     }
     g_rodeoCalls = reinterpret_cast<volatile uint64_t*>(stub + 16);
@@ -832,7 +863,7 @@ std::vector<uintptr_t> FindAll(const Pattern& pattern, SectionKind kind) {
     std::vector<uintptr_t> hits;
     for (const Range& range : ReadableRanges(kind)) {
         if (!ScanRange(range, pattern, hits)) {
-            Log("lookup scan: read fault in %p to %p", range.first, range.last);
+            LogProblem("lookup scan: read fault in %p to %p", range.first, range.last);
             return {};
         }
     }
@@ -867,7 +898,7 @@ std::vector<uintptr_t> FindVtables(const char* className) {
 bool LookupVtable(const char* name, const char* className, uintptr_t& out) {
     const std::vector<uintptr_t> vtables = FindVtables(className);
     if (vtables.size() != 1) {
-        Log("lookup %s FAILED: %zu vtables for %s", name, vtables.size(), className);
+        LogProblem("lookup %s FAILED: %zu vtables for %s", name, vtables.size(), className);
         return false;
     }
     out = vtables[0];
@@ -879,7 +910,7 @@ bool LookupVtable(const char* name, const char* className, uintptr_t& out) {
 bool LookupSignature(const char* name, const Signature& signature, uintptr_t& out) {
     const std::vector<uintptr_t> hits = FindAll(ParseSignature(signature.text), SectionKind::Code);
     if (hits.size() != 1) {
-        Log("lookup %s FAILED: %zu signature matches", name, hits.size());
+        LogProblem("lookup %s FAILED: %zu signature matches", name, hits.size());
         return false;
     }
     out = hits[0] + signature.distance;
@@ -907,7 +938,7 @@ bool LookupWorldSystemSlot() {
         }
     }
     if (top == 0 || top < kWorldMinRatio * next) {
-        Log("lookup worldSystemSlot FAILED: %d references, next %d", top, next);
+        LogProblem("lookup worldSystemSlot FAILED: %d references, next %d", top, next);
         return false;
     }
     g_worldSystemSlot = slot;
@@ -915,8 +946,8 @@ bool LookupWorldSystemSlot() {
     return true;
 }
 
-// Run every lookup and log each result. Return whether the mod can run, which needs all of them except the key check,
-// because that one is only diagnostics.
+// Run every lookup and log each result. Return whether the mod can run. The key check is left out of that, and only runs
+// when Logging is on, because it's only diagnostics.
 bool RunLookups() {
     const ULONGLONG start = GetTickCount64();
     bool ok = LookupVtable("vtActorManager", kClassActorManager, g_vtActorManager);
@@ -925,22 +956,20 @@ bool RunLookups() {
     ok &= LookupWorldSystemSlot();
     ok &= LookupSignature("hookSite", kHookSiteSignature, g_hookSite);
     ok &= LookupSignature("stickSite", kStickSiteSignature, g_stickSite);
-    LookupSignature("keyCheck", kKeyCheckSignature, g_keyCheck);
+    if (g_logging) LookupSignature("keyCheck", kKeyCheckSignature, g_keyCheck);
     Log("lookups took %llu ms", GetTickCount64() - start);
     return ok;
 }
 
 bool InstallHook() {
-    Log("HorseSteer %s loaded: base %p, PE timestamp 0x%08X", kVersion, reinterpret_cast<void*>(g_base),
-        GameHeaders()->FileHeader.TimeDateStamp);
     if (!RunLookups()) {
-        Log("a required lookup failed: hooks not installed, mod idle");
+        LogProblem("a required lookup failed: hooks not installed, mod idle");
         return false;
     }
     auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + g_hookSite), OnInputUpdate);
     auto stickHook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + g_stickSite), OnStickRead);
     if (!hook || !stickHook) {
-        Log("hooks failed to install");
+        LogProblem("hooks failed to install: mod idle");
         return false;
     }
     g_hook = std::move(*hook);
@@ -954,10 +983,18 @@ bool InstallHook() {
 
 DWORD WINAPI ModThread(void* param) {
     const std::wstring dir = ModuleDir(static_cast<HMODULE>(param));
+    g_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     const std::wstring settings = dir + L"\\HorseSteer.ini";
-    if (GetPrivateProfileIntW(L"Debug", L"Logging", 0, settings.c_str()) != 0) {
-        g_log = _wfsopen((dir + L"\\HorseSteer.log").c_str(), L"w", _SH_DENYNO);
-        g_csv = _wfsopen((dir + L"\\HorseSteer.csv").c_str(), L"w", _SH_DENYNO);
+    const std::wstring csvPath = dir + L"\\HorseSteer.csv";
+    g_logPath = dir + L"\\HorseSteer.log";
+    g_logging = GetPrivateProfileIntW(L"Debug", L"Logging", 0, settings.c_str()) != 0;
+    if (g_logging) {
+        OpenLog();
+        g_csv = _wfsopen(csvPath.c_str(), L"w", _SH_DENYNO);
+    } else {
+        // Remove files from an earlier run, so that a log existing means this run had a problem.
+        DeleteFileW(g_logPath.c_str());
+        DeleteFileW(csvPath.c_str());
     }
     if (g_csv) {
         fputs("tick_ms,w,a,s,d,enabled,flip,mounted,mount_key,forward_from_mount,rider_phys_yaw,mount_phys_yaw,"
@@ -967,7 +1004,6 @@ DWORD WINAPI ModThread(void* param) {
               "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y,mount_package,backward_rate\n",
               g_csv);
     }
-    g_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
 
     LoadSettings(settings);
 
@@ -996,7 +1032,7 @@ DWORD WINAPI ModThread(void* param) {
             }
         }
         f5Was = f5;
-        if (g_log) LogStateChange();
+        if (g_logging) LogStateChange();
 
         const ULONGLONG now = GetTickCount64();
         if (now - lastTelemetry < 100) continue;

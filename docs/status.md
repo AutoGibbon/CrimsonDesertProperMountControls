@@ -7,11 +7,11 @@ walks the horse backward. On branch `mount-testing`, the controls and backward w
 
 ## Resume here
 
-Work is on branch `mount-testing`. The build in `DMM\mods` matches the source. The Logging, Speed and **Lookups** steps are done, passing [stage 10](horsesteer-tests/stage-10.md) and [stage 10b](horsesteer-tests/stage-10b.md). The mount work in step 2 below is done on every reachable mount, passing [stage 12](horsesteer-tests/stage-12.md), [stage 12b](horsesteer-tests/stage-12b.md) and [stage 13](horsesteer-tests/stage-13.md) on a modified save with a range of mounts. Logging is now behind `Logging` in `HorseSteer.ini`, off by default. That change compiles but hasn't run in game, so check it at the next launch.
+Work is on branch `mount-testing`. The build in `DMM\mods` matches the source. The Logging, Speed and **Lookups** steps are done, passing [stage 10](horsesteer-tests/stage-10.md) and [stage 10b](horsesteer-tests/stage-10b.md). The mount work in step 2 below is done on every reachable mount, passing [stage 12](horsesteer-tests/stage-12.md), [stage 12b](horsesteer-tests/stage-12b.md) and [stage 13](horsesteer-tests/stage-13.md) on a modified save with a range of mounts. Tracing is behind `Logging` in `HorseSteer.ini`, off by default, and `LogProblem` always writes startup problems. That change compiles but hasn't run in game, so check it at the next launch.
 
 Carriages in step 3 are next, but they're blocked: the test save shows wagons with no option to steal or mount them. The tester plans to get another save from community resources, or progress the current one. To resume:
 
-1. In DMM, turn `HorseSteer` off and on again and apply, so that `bin64` gets the current build. Check that with `Logging=0` no `HorseSteer.log` or new CSV appears and the controls still work. `HorseSteer.csv` from earlier runs may still be there, so go by its date.
+1. In DMM, turn `HorseSteer` off and on again and apply, so that `bin64` gets the current build. Check that with `Logging=0` the controls still work, and that `bin64` has no `HorseSteer.log` or `HorseSteer.csv`, because launching deletes any left from earlier runs. Saved logs in `scratch/probe-runs/` aren't affected.
 2. Once a wagon can be mounted, set `Logging=1` in `DMM\mods\HorseSteer.ini` and apply. Drive one for about a minute with W, A, D and S while moving the camera, and try a cow-drawn one too. No new build is needed, because the mod stays inactive on a package it doesn't recognise.
 3. Read `mount package` and `mount appearance` in the log and the CSV. Then add the wagon's package to a test build, to find out whether replacing the camera vectors steers it.
 
@@ -34,4 +34,4 @@ The start of the backward walk is otherwise fine at `kBackwardMaxStartSpeed` 0.2
 3. Investigate carriages, which should get similar controls if possible. This is expected to be separate work, with its own round of probe logging and code execution
    capture. They aren't in `g_groundMounts`, and the wagon has its own charts (`r0012_wagon_upper`, which reads `key_brake`, and `ride_carriage_lower` and
    `ride_carriage_upper`). The first question is whether replacing the camera vectors applies to them.
-4. Before release, decide whether the CSV and detailed log lines stay behind `Logging` or go. Failed lookups currently leave no trace with `Logging=0`, so consider always writing a short log. Also add a speed limit to the horse's state-ID recovery in `UpdateBackwardRecovery`, which pulses once a second when the horse is stopped against something. Keep the limit below the 0.8 to 0.91 m/s where it still fires usefully.
+4. Before release, add a speed limit to the horse's state-ID recovery in `UpdateBackwardRecovery`, which pulses once a second when the horse is stopped against something. Keep the limit below the 0.8 to 0.91 m/s where it still fires usefully.

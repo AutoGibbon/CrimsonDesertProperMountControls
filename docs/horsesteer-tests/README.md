@@ -4,7 +4,7 @@ Give each new test its own file, `stage-N.md`, with its steps and results, and a
 
 ## Logs
 
-Logging is off by default. Before a test, set `Logging=1` under `[Debug]` in `DMM\mods\HorseSteer.ini` and apply in DMM, or the test leaves no logs.
+Tracing is off by default. Before a test, set `Logging=1` under `[Debug]` in `DMM\mods\HorseSteer.ini` and apply in DMM, or the test leaves no logs. With `Logging=0`, `HorseSteer.log` only exists if the mod had a problem at startup, such as a failed lookup, and launching deletes the log and CSV from any earlier run.
 
 `bin64\HorseSteer.log` records each address lookup, the hook install, mount changes and which actor each input slot belongs to. `bin64\HorseSteer.csv` is written about 10 times a
 second while mounted. Slot `i0` is the rider's input component and `i1` is the horse's. With W held and the mod working, `mount_phys_yaw` and `travel_yaw` stay
