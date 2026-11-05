@@ -3,11 +3,11 @@
 Where the mod stands and what to do next. Requirements are in [discovery.md](discovery.md) and evidence is in [findings/](findings/).
 
 **Status:** `src/HorseSteer` is the working mod, and v0.0.1 is the working horse prototype. Forward steering and free look work at walk, trot and gallop, S with A or D pivots, and S alone
-walks the horse backward. On branch `mount-testing`, the controls and backward walk also work on the 12 other mounts reached, with no setup. The mod pauses during the taming minigame. It runs on Steam build 26423880 (PE timestamp `0x6AEA07A6`) and finds its addresses at startup, and the exe copies for this build and 3479 are in `scratch/exe-baseline/`.
+walks the horse backward. The controls and backward walk also work on the 12 other mounts reached, with no setup. The mod pauses during the taming minigame. It runs on Steam build 26423880 (PE timestamp `0x6AEA07A6`) and finds its addresses at startup, and the exe copies for this build and 3479 are in `scratch/exe-baseline/`.
 
 ## Resume here
 
-Work is on branch `mount-testing`. The build in `DMM\mods` matches the source. The Logging, Speed and **Lookups** steps are done, passing [stage 10](horsesteer-tests/stage-10.md) and [stage 10b](horsesteer-tests/stage-10b.md). The mount work in step 2 below is done on every reachable mount, passing [stage 12](horsesteer-tests/stage-12.md), [stage 12b](horsesteer-tests/stage-12b.md) and [stage 13](horsesteer-tests/stage-13.md) on a modified save with a range of mounts. Tracing is behind `Logging` in `HorseSteer.ini`, off by default, and `LogProblem` always writes startup problems. That change compiles but hasn't run in game, so check it at the next launch.
+Work is on `main`. The build in `DMM\mods` matches the source. The Logging, Speed and **Lookups** steps are done, passing [stage 10](horsesteer-tests/stage-10.md) and [stage 10b](horsesteer-tests/stage-10b.md). The mount work in step 2 below is done on every reachable mount, passing [stage 12](horsesteer-tests/stage-12.md), [stage 12b](horsesteer-tests/stage-12b.md) and [stage 13](horsesteer-tests/stage-13.md) on a modified save with a range of mounts. Tracing is behind `Logging` in `HorseSteer.ini`, off by default, and `LogProblem` always writes startup problems. That change compiles but hasn't run in game, so check it at the next launch.
 
 Carriages in step 3 are next, but they're blocked: the test save shows wagons with no option to steal or mount them. The tester plans to get another save from community resources, or progress the current one. To resume:
 
