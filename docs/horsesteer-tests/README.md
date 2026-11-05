@@ -8,6 +8,12 @@ Give each new test its own file, `stage-N.md`, with its steps and results, and a
 second while mounted. Slot `i0` is the rider's input component and `i1` is the horse's. With W held and the mod working, `mount_phys_yaw` and `travel_yaw` stay
 steady while `i0_camera_yaw` changes, and `travel_yaw` is about 180° from `mount_phys_yaw`. `i0_relative` tracks the mount's heading, not 0. `mount_state` is a chart state pointer in hex, 0 if unreadable, and `-9999` marks a missing `mount_value`, velocity or `rider_y`. `rider_y` is the rider's height from its physics position. From stage 10, `speed`, `travel_yaw` and `rider_y` no longer include the chunk origin, so `rider_y` isn't world height, and `speed` can spike for one row if the origin moves. `HorseSteer.log` records each `UpdateBackwardRecovery` pulse with the state it started from and the speed.
 
+From stage 11, the CSV ends with `mount_package`, `marker` and `backward_rate`. `HorseSteer.log` adds `mount package` and `mount identity` lines for each mount, `state` lines with the low 16 bits of `mount_state` at each change, and `marker` and `backward rate` lines. These lines carry `tick=`, which matches the CSV's `tick_ms`. A `?` in `mount identity` means that name couldn't be read.
+
+From stage 11b, `bin64\HorseSteer_scan_<key>a.txt` and `...b.txt` hold each mount's scan, 5 and 30 seconds after mounting. Each line is a text or RTTI class name and the chain that reached it, such as `mount->+68->+40 inline+18`, with up to 3 chains per name. `HorseSteer.log` records `controls forced on` when End is pressed, and a `mount scan` line for each scan. A forced mount's `mount_package` still shows what `ReadPackageName` read.
+
+From stage 12, the scan files and `mount identity` lines are gone. `HorseSteer.log` adds an `ini` line with the number of values read, a `mount appearance` line per mount, and a `backward release pulse` line at each release. From stage 12b, `backward lost pulse` lines replace the release pulse lines, each with the state it started from.
+
 ## Tests
 
 | Test | Checks | Result |
@@ -37,4 +43,8 @@ steady while `i0_camera_yaw` changes, and `travel_yaw` is about 180° from `moun
 | [stage-9d](stage-9d.md) | Forward pulse when the chart state leaves the walk during the backward walk | Passed. Both state drops at about 1 m/s recovered with no forward movement. Another 19 pulses fired while the horse was stopped by a wall or object, with no problem noticed |
 | [stage-10](stage-10.md) | Addresses found at startup, with riding, backward walk and taming | Passed. All lookups matched in live memory, and the rodeo switch worked. Of two tames, only the one with keys pressed before the UI closed moved afterward |
 | [stage-10b](stage-10b.md) | A failed lookup leaves the mod idle, and the post-win freeze with no hooks | Passed: the log named the failed lookup, and the game played as unmodded. The freeze check was inconclusive: one tame moved, but the tester wasn't sure the keys were released in time |
+| [stage-11](stage-11.md) | Controls and backward walk on each ground mount, with mount identity logging | Horse passed. Camel and reindeer untested: `ReadPackageName` failed on them, so the mount check left the mod inactive |
+| [stage-11b](stage-11b.md) | Memory scan of each mount for a name that works, and the stage 11 steps with a key that forces the controls on | Passed on all 9 non-horse mounts reached, with End. Scans found the package at `+0x18`. Elephant and cucubird not reached |
+| [stage-12](stage-12.md) | Mounts recognised without End, speeds from `HorseSteer.ini`, and a pulse when A or D is released in reverse | Recognition, the `.ini` and speeds passed on 13 mounts, with no lurch. Mounts still lost the backward walk and slid, so the pulse was replaced |
+| [stage-12b](stage-12b.md) | Pulses when the mount's chart value goes missing during the backward walk | Passed on the camel, boar, cucubird, reindeer and horse: slides ended within 0.4 s, with no lurch, including at walls. Cucubird gliding also steers correctly |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

@@ -34,7 +34,7 @@ against the mount's facing, so the camera stays free. Test status is in `docs/ho
 Open points:
 
 - **Drift recovery:** not a confirmed problem. The tester saw rougher recovery in stage 5 and suspects needing S to start the drift made the escape inputs harder. Removing S as the trigger should remove that factor; recheck only if it's still noticed with Alt.
-- **Mount check:** the action package name must be in `kGroundMountPackages`. It works on the horse in game; other mounts are untested and use their own charts. `CD_M0003_CucuBird` is included, and its gliding states are untested.
+- **Mount check:** the action package name must be in `g_groundMounts`. `ReadPackageName` reads the name at `+0x18`, which worked on all 13 mounts in stage 12. Other mounts use their own charts. `CD_M0003_CucuBird` is included, and steering worked while gliding in stage 12b.
 - **Game camera follow and lookahead:** stage 1 ran with both off, and steering with them on is untested. The game itself runs normally with them on.
 
 The game setting and camera preset routes are ruled out: both work by keeping the camera behind the horse, which breaks

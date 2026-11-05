@@ -1,11 +1,15 @@
 // Horse-relative riding controls: on ground mounts, replaces the camera direction vectors in
 // ClientInputActorComponent's per-frame update with the mount's, so move input is resolved against the mount's facing.
 // Also widens and ramps in forward steering angles, and removes backward input, which leaves S with a steering input as
-// a pivot. On the horse, S also walks it backward from a near stop. All of this stops while the taming minigame runs,
-// because it needs the game's own input directions.
+// a pivot. S also walks the mount backward from a near stop. All of this stops while the taming minigame runs, because it
+// needs the game's own input directions.
 //
 // F5        toggle the mod
 // Shift+F5  flip the forward direction
+// Insert    add a numbered marker to the log and CSV
+// PageUp    raise the backward walk's rate
+// PageDown  lower the backward walk's rate
+// End       turn the controls on for the current mount, whatever its package reads as, until the next mount
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -71,11 +75,21 @@ constexpr uint32_t kInput_MoveAngleRelative = 0x8C;
 constexpr uint32_t kInput_CameraForward = 0x154;
 constexpr uint32_t kInput_CameraRight = 0x160;
 
-// Land mounts' packages. Water mounts, the dragon and machines are left out.
-constexpr const char* kGroundMountPackages[] = {
-    "CD_R0001_Horse", "CD_M0002_Camel", "CD_M0002_Reindeer", "CD_M0002_Elephant",  "CD_M0002_BattleBoar",
-    "CD_M0002_Bear",  "CD_M0002_Wolf",  "CD_M0002_Wolf_Elite", "CD_M0002_Wolf_Elite_Big", "CD_M0002_Wolf_Boss",
-    "CD_R0034_Iguana", "CD_R0035_CarmaBirdsaurus", "CD_M0003_CucuBird",
+// A land mount's package and its backward walk speed in m/s, which LoadSettings can replace from HorseSteer.ini.
+struct GroundMount {
+    const char* package;
+    float backwardSpeed;
+};
+
+// Water mounts, the dragon and machines are left out. The elephant's and other wolf packages' speeds are untuned.
+GroundMount g_groundMounts[] = {
+    {"CD_R0001_Horse", 1.0f},          {"CD_M0002_Camel", 1.9f},
+    {"CD_M0002_Reindeer", 1.2f},       {"CD_M0002_Elephant", 1.0f},
+    {"CD_M0002_BattleBoar", 1.6f},     {"CD_M0002_Bear", 1.8f},
+    {"CD_M0002_Wolf", 1.8f},           {"CD_M0002_Wolf_Elite", 1.7f},
+    {"CD_M0002_Wolf_Elite_Big", 1.8f}, {"CD_M0002_Wolf_Boss", 1.8f},
+    {"CD_R0034_Iguana", 1.2f},         {"CD_R0035_CarmaBirdsaurus", 1.6f},
+    {"CD_M0003_CucuBird", 1.0f},
 };
 
 // Forward steering multiplies W+A's 45 degree stick angle by these, blending between the two speeds in m/s.
@@ -85,21 +99,33 @@ constexpr float kTightSteerSpeed = 2.5f;
 constexpr float kWideSteerSpeed = 5.0f;
 constexpr float kMaxSteerAngle = 85.0f / 57.29578f;
 constexpr float kSteerRampMs = 300.0f;
-// Added to the horse's position per second during the backward walk. It moves at about twice this, roughly 1 m/s.
+// Default for g_backwardRate. Every mount tested moves at about twice its rate in m/s.
 constexpr float kBackwardMoveRate = 0.5f;
-// Reads as forward input for this long, so that the horse leaves idle for a state that uses the walking blend.
+constexpr float kBackwardRatePerSpeed = 0.5f;
+constexpr float kBackwardRateStep = 0.1f;
+constexpr float kBackwardRateMin = 0.1f;
+constexpr float kBackwardRateMax = 3.0f;
+constexpr float kBackwardSpeedMin = kBackwardRateMin / kBackwardRatePerSpeed;
+constexpr float kBackwardSpeedMax = kBackwardRateMax / kBackwardRatePerSpeed;
+// Reads as forward input for this long, so that the mount leaves idle for a state that uses the walking blend.
 constexpr int kBackwardPulseMs = 150;
-// The backward walk starts once the horse is below this speed in m/s, which is near the end of a stop.
+// The backward walk starts once the mount is below this speed in m/s, which is near the end of a stop.
 constexpr float kBackwardMaxStartSpeed = 0.2f;
 // A full steering input leaves the walking blend for a forward walk. This size stays in the blend and curves the path.
 constexpr float kBackwardSteer = 0.56f;
+constexpr float kBackwardSteerMin = 0.1f;
+constexpr float kBackwardSteerMax = 0.8f;
+// UpdateBackwardRecovery pulses when a mount above this speed in m/s has had no chart value for this long, repeating at
+// this gap. The speed check leaves out a mount held still by a wall.
+constexpr float kBackwardLostMinSpeed = 0.3f;
+constexpr ULONGLONG kBackwardLostDelayMs = 200;
+constexpr ULONGLONG kBackwardLostGapMs = 500;
 // Low 16 bits of the horse's chart state pointer during the walk, which stay the same between sessions.
 constexpr uint16_t kStateWalkStart = 0xA37D;
 constexpr uint16_t kStateWalk = 0xA73F;
 constexpr uint16_t kStateWalkSteer = 0xA56E;
 // Minimum time between pulses that return the horse to the walk state, in case a pulse doesn't get it there.
 constexpr ULONGLONG kBackwardRecoveryGapMs = 1000;
-constexpr const char* kHorsePackage = "CD_R0001_Horse";
 
 constexpr float kMissing = -9999.0f;
 constexpr float kRadToDeg = 57.29578f;
@@ -146,7 +172,8 @@ std::atomic<float> g_mountSpeed{0};
 std::atomic<int> g_steerSide{0};
 std::atomic<ULONGLONG> g_steerStart{0};
 volatile uint64_t* g_rodeoCalls = nullptr;
-std::atomic<uintptr_t> g_horseMount{0};
+std::atomic<float> g_backwardRate{kBackwardMoveRate};
+std::atomic<float> g_backwardSteer{kBackwardSteer};
 std::atomic<ULONGLONG> g_backwardPulseEnd{0};
 std::atomic<bool> g_backwardWanted{false};
 std::atomic<bool> g_backwardWalking{false};
@@ -308,22 +335,66 @@ Ride ResolveRide() {
     return ride;
 }
 
-// Return the name of a mount's action package, which is the element name in characteractionpackagedescription.xml.
+// Return the printable text at addr, up to 127 characters.
+std::string ReadText(uintptr_t addr) {
+    std::string text;
+    for (int i = 0; i < 127; ++i) {
+        char c = 0;
+        if (!Read(addr + i, c) || c < 0x20 || c > 0x7E) break;
+        text.push_back(c);
+    }
+    return text;
+}
+
+// Return the entry in g_groundMounts for a package name in any case, or nullptr.
+const GroundMount* FindGroundMount(const std::string& name) {
+    for (const GroundMount& mount : g_groundMounts) {
+        if (_stricmp(name.c_str(), mount.package) == 0) return &mount;
+    }
+    return nullptr;
+}
+
+// Return a mount's action package name, which is the element name in characteractionpackagedescription.xml, in lowercase
+// at +0x18. The name at +0x48 is only there on some mounts, so it's used if +0x18 isn't a ground mount.
 std::string ReadPackageName(uintptr_t mount) {
     const uintptr_t components = ReadPtr(mount + 0x68);
     const uintptr_t control = components ? ReadPtr(components + 0x40) : 0;
     const uintptr_t owner = control ? ReadPtr(control + 0x28) : 0;
     const uintptr_t package = owner ? ReadPtr(owner + 0x18) : 0;
-    char name[64] = {};
-    if (!package || !SafeRead(package + 0x48, name, sizeof name - 1)) return {};
-    return std::string(name, strnlen(name, sizeof name - 1));
+    if (!package) return {};
+    const std::string lower = ReadText(package + 0x18);
+    if (FindGroundMount(lower)) return lower;
+    const std::string upper = ReadText(package + 0x48);
+    return FindGroundMount(upper) ? upper : lower;
 }
 
-bool IsGroundMountPackage(const std::string& name) {
-    for (const char* allowed : kGroundMountPackages) {
-        if (name == allowed) return true;
+// Return a mount's appearance file path, which separates mounts that share a package, or nothing if it can't be read.
+std::string ReadAppearance(uintptr_t mount) {
+    const uintptr_t components = ReadPtr(mount + 0x68);
+    const uintptr_t control = components ? ReadPtr(components + 0x40) : 0;
+    const uintptr_t first = control ? ReadPtr(control + 0x40) : 0;
+    const uintptr_t second = first ? ReadPtr(first + 0x38) : 0;
+    return second ? ReadText(second + 0x18) : std::string();
+}
+
+// Replace the backward speeds and reverse steering input with any values in the ini at path, and log what's in use.
+void LoadSettings(const std::wstring& path) {
+    wchar_t text[32];
+    const auto read = [&](const wchar_t* section, const wchar_t* key, float& value, float low, float high) {
+        if (GetPrivateProfileStringW(section, key, L"", text, 32, path.c_str()) == 0) return false;
+        value = std::clamp(wcstof(text, nullptr), low, high);
+        return true;
+    };
+    int found = 0;
+    for (GroundMount& mount : g_groundMounts) {
+        const std::string name(mount.package);
+        const std::wstring key(name.begin(), name.end());
+        if (read(L"BackwardSpeed", key.c_str(), mount.backwardSpeed, kBackwardSpeedMin, kBackwardSpeedMax)) ++found;
     }
-    return false;
+    float steer = kBackwardSteer;
+    if (read(L"Reverse", L"SteerInput", steer, kBackwardSteerMin, kBackwardSteerMax)) ++found;
+    g_backwardSteer = steer;
+    Log("ini: %d values read, reverse steer input %.2f", found, steer);
 }
 
 // Return whether the taming minigame's UI was updated within kRodeoTimeoutMs.
@@ -385,7 +456,7 @@ bool ApplyMountDirection(uintptr_t input, const Ride& ride, InputSample& sample)
            SafeWrite(input + kInput_CameraRight, &newRight, sizeof newRight);
 }
 
-// Move the horse backward along its facing while g_backwardWanted is set, starting once it's below kBackwardMaxStartSpeed.
+// Move the mount backward along its facing while g_backwardWanted is set, starting once it's below kBackwardMaxStartSpeed.
 // The move goes through its physics position, so the game still applies ground height and collisions.
 void UpdateBackwardWalk(const Ride& ride) {
     static bool active = false;
@@ -412,8 +483,9 @@ void UpdateBackwardWalk(const Ride& ride) {
     last = now;
     const float len = std::hypot(axisZ.x, axisZ.z);
     if (len < 0.001f) return;
-    position.x += axisZ.x / len * kBackwardMoveRate * dt;
-    position.z += axisZ.z / len * kBackwardMoveRate * dt;
+    const float rate = g_backwardRate.load();
+    position.x += axisZ.x / len * rate * dt;
+    position.z += axisZ.z / len * rate * dt;
     SafeWrite(physics + 0x90, &position, sizeof position);
 }
 
@@ -437,10 +509,10 @@ void OnInputUpdate(SafetyHookContext& ctx) {
     bool applied = false;
     if (RidingGroundMount(ride) && ride.haveForward) applied = ApplyMountDirection(input, ride, sample);
     sample.applied = applied;
-    if (RidingGroundMount(ride) && actor == ride.mount && ride.mount == g_horseMount.load()) UpdateBackwardWalk(ride);
+    if (RidingGroundMount(ride) && actor == ride.mount) UpdateBackwardWalk(ride);
 }
 
-// Return whether backward input should read as forward for now: for kBackwardPulseMs once the horse is below
+// Return whether backward input should read as forward for now: for kBackwardPulseMs once the mount is below
 // kBackwardMaxStartSpeed, once per press.
 bool UpdateBackwardPulse(bool wanted) {
     static std::atomic<bool> pulsed{false};
@@ -457,24 +529,36 @@ bool UpdateBackwardPulse(bool wanted) {
     return now < g_backwardPulseEnd.load();
 }
 
-// Start another backward pulse if the mount's chart state has left the walk states while the walk is running, so that
-// the walking animation returns. Wait for steering to end, because steering with a pulse is a forward turn.
+// Start another backward pulse if the mount has left its walk while the walk is running, so that the walking animation
+// returns. On any mount, a chart state with no value means a stop or idle. The horse's kStateWalk checks also catch states
+// that have a value. Wait for steering to end, because steering with a pulse is a forward turn.
 void UpdateBackwardRecovery(const Ride& ride, bool steering) {
     static bool inWalk = false;
-    static ULONGLONG nextAllowed = 0;
+    static ULONGLONG nextAllowed = 0, lostSince = 0, nextLostPulse = 0;
     if (!g_backwardWanted.load() || !g_backwardWalking.load()) {
         inWalk = false;
+        lostSince = 0;
         return;
     }
     uintptr_t state = 0;
     float value = 0;
     if (!ReadChartState(ride.mount, state, value)) return;
     const auto id = static_cast<uint16_t>(state);
+    const ULONGLONG now = GetTickCount64();
+    if (value == kMissing && !steering && g_mountSpeed.load() > kBackwardLostMinSpeed) {
+        if (lostSince == 0) lostSince = now;
+        if (now - lostSince >= kBackwardLostDelayMs && now >= nextLostPulse) {
+            nextLostPulse = now + kBackwardLostGapMs;
+            g_backwardPulseEnd = now + kBackwardPulseMs;
+            Log("backward lost pulse from state %04X tick=%llu speed=%.2f", id, now, g_mountSpeed.load());
+        }
+        return;
+    }
+    lostSince = 0;
     if (id == kStateWalk || id == kStateWalkSteer) {
         inWalk = true;
         return;
     }
-    const ULONGLONG now = GetTickCount64();
     if (!inWalk || id == kStateWalkStart || steering || now < nextAllowed) return;
     nextAllowed = now + kBackwardRecoveryGapMs;
     g_backwardPulseEnd = now + kBackwardPulseMs;
@@ -482,7 +566,7 @@ void UpdateBackwardRecovery(const Ride& ride, bool steering) {
 }
 
 // Adjust the raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
-// and widen forward steering. On the horse, S alone starts the backward walk, and A or D during it steers.
+// and widen forward steering. S alone starts the backward walk, and A or D during it steers.
 void OnStickRead(SafetyHookContext& ctx) {
     const Ride ride = ResolveRide();
     if (!RidingGroundMount(ride)) {
@@ -498,12 +582,11 @@ void OnStickRead(SafetyHookContext& ctx) {
     const bool backward = stick[1] < 0.0f;
     const bool steering = std::fabs(stick[0]) > 0.01f;
     const bool reverseSteering = backward && steering && g_backwardWalking.load();
-    const bool isHorse = ride.mount == g_horseMount.load();
-    const bool pulse = UpdateBackwardPulse(isHorse && backward && (!steering || reverseSteering));
+    const bool pulse = UpdateBackwardPulse(backward && (!steering || reverseSteering));
     UpdateBackwardRecovery(ride, steering);
     if (backward) {
         stick[1] = pulse ? 1.0f : 0.0f;
-        if (reverseSteering) stick[0] = std::copysign(kBackwardSteer, stick[0]);
+        if (reverseSteering) stick[0] = std::copysign(g_backwardSteer.load(), stick[0]);
     } else if (stick[1] > 0.0f && std::fabs(stick[0]) > 0.01f) {
         WidenSteering(stick[0], stick[1], g_mountSpeed.load(), ramp);
     } else {
@@ -569,7 +652,41 @@ bool GameFocused() {
     return pid == GetCurrentProcessId();
 }
 
-void WriteTelemetry(const Ride& ride) {
+// Return whether vk went down since the last call with this was, while the game has focus.
+bool KeyPressed(int vk, bool& was) {
+    const bool down = GameFocused() && KeyDown(vk);
+    const bool pressed = down && !was;
+    was = down;
+    return pressed;
+}
+
+// Change g_backwardRate by delta within its limits, then log and beep.
+void ChangeBackwardRate(float delta) {
+    const float rate = std::clamp(g_backwardRate.load() + delta, kBackwardRateMin, kBackwardRateMax);
+    g_backwardRate = rate;
+    Log("backward rate %.2f tick=%llu", rate, GetTickCount64());
+    Beep(delta > 0 ? 1000 : 700, 80);
+}
+
+// Log the ground mount's chart state when it changes, because the CSV's 10 rows a second can miss short states.
+void LogStateChange() {
+    static uint16_t last = 0;
+    const uintptr_t mount = g_groundMount.load();
+    uintptr_t state = 0;
+    float value = 0;
+    if (!mount || !ReadChartState(mount, state, value)) {
+        last = 0;
+        return;
+    }
+    const auto id = static_cast<uint16_t>(state);
+    if (id == last) return;
+    last = id;
+    float x = 0, z = 0;
+    const bool haveVelocity = ReadVelocity(mount, x, z);
+    Log("state %04X tick=%llu speed=%.2f", id, GetTickCount64(), haveVelocity ? std::hypot(x, z) : kMissing);
+}
+
+void WriteTelemetry(const Ride& ride, const std::string& package, int marker) {
     static Vec3 lastPos{};
     static ULONGLONG lastTick = 0, lastFlush = 0;
     static size_t rows = 0;
@@ -609,7 +726,7 @@ void WriteTelemetry(const Ride& ride) {
     fprintf(g_csv, ",%llX,%.3f,%.3f,%.3f,%.3f,%.2f", static_cast<unsigned long long>(chartState), chartValue,
             haveVelocity ? velX : kMissing, haveVelocity ? velZ : kMissing,
             haveVelocity ? std::hypot(velX, velZ) : kMissing, haveRider ? riderPos.y : kMissing);
-    fputc('\n', g_csv);
+    fprintf(g_csv, ",%s,%d,%.2f\n", package.c_str(), marker, g_backwardRate.load());
     ++rows;
     if (now - lastFlush > 1000) {
         fflush(g_csv);
@@ -657,11 +774,12 @@ struct Range {
     const uint8_t* last = nullptr;
 };
 
+constexpr DWORD kReadable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ |
+                            PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+
 // Return the readable parts of the game's sections of the given kind, joining adjacent regions so that a match can span
 // them.
 std::vector<Range> ReadableRanges(SectionKind kind) {
-    constexpr DWORD kReadable = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ |
-                                PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
     std::vector<Range> ranges;
     const IMAGE_NT_HEADERS* nt = GameHeaders();
     const IMAGE_SECTION_HEADER* section = IMAGE_FIRST_SECTION(nt);
@@ -867,9 +985,12 @@ DWORD WINAPI ModThread(void* param) {
               "rider_sync_yaw,mount_sync_yaw,speed,travel_yaw,"
               "i0_applied,i0_stick_x,i0_stick_y,i0_angle,i0_relative,i0_camera_yaw,i0_target_yaw,"
               "i1_applied,i1_stick_x,i1_stick_y,i1_angle,i1_relative,i1_camera_yaw,i1_target_yaw,"
-              "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y\n", g_csv);
+              "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y,mount_package,marker,backward_rate\n",
+              g_csv);
     }
     g_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+
+    LoadSettings(dir + L"\\HorseSteer.ini");
 
     // Other mods report crashes when hooking during the first seconds of launch.
     Sleep(20000);
@@ -877,9 +998,12 @@ DWORD WINAPI ModThread(void* param) {
 
     bool f5Was = false, wasMounted = false, wasFromMount = false, wasRodeo = false;
     uintptr_t seen[2] = {};
-    uintptr_t classified = 0;
-    bool reportedUnreadable = false;
+    uintptr_t currentMount = 0;
+    bool classified = false, reportedUnknown = false;
     ULONGLONG lastTelemetry = 0;
+    bool markerWas = false, fasterWas = false, slowerWas = false, forceWas = false, forceWanted = false;
+    int marker = 0;
+    std::string package;
     for (;;) {
         Sleep(10);
         const bool f5 = GameFocused() && KeyDown(VK_F5);
@@ -895,6 +1019,15 @@ DWORD WINAPI ModThread(void* param) {
             }
         }
         f5Was = f5;
+        if (KeyPressed(VK_INSERT, markerWas)) {
+            ++marker;
+            Log("marker %d tick=%llu", marker, GetTickCount64());
+            Beep(1500, 80);
+        }
+        if (KeyPressed(VK_PRIOR, fasterWas)) ChangeBackwardRate(kBackwardRateStep);
+        if (KeyPressed(VK_NEXT, slowerWas)) ChangeBackwardRate(-kBackwardRateStep);
+        if (KeyPressed(VK_END, forceWas)) forceWanted = true;
+        LogStateChange();
 
         const ULONGLONG now = GetTickCount64();
         if (now - lastTelemetry < 100) continue;
@@ -911,23 +1044,34 @@ DWORD WINAPI ModThread(void* param) {
             wasMounted = ride.mounted;
             wasFromMount = ride.forwardFromMount;
         }
-        if (ride.mount != classified) {
+        if (ride.mount != currentMount) {
+            currentMount = ride.mount;
             g_groundMount = 0;
-            g_horseMount = 0;
-            classified = 0;
-            if (ride.mount) {
-                const std::string package = ReadPackageName(ride.mount);
-                if (!package.empty()) {
-                    classified = ride.mount;
-                    reportedUnreadable = false;
-                    const bool ground = IsGroundMountPackage(package);
-                    if (ground) g_groundMount = ride.mount;
-                    if (package == kHorsePackage) g_horseMount = ride.mount;
-                    Log("mount package: %s (%s)", package.c_str(), ground ? "controls on" : "not a ground mount, mod inactive");
-                } else if (!reportedUnreadable) {
-                    reportedUnreadable = true;
-                    Log("mount package unreadable: mod inactive until it can be read");
-                }
+            g_backwardRate = kBackwardMoveRate;
+            classified = reportedUnknown = false;
+            package.clear();
+            if (currentMount) Log("mount appearance: %s", ReadAppearance(currentMount).c_str());
+        }
+        if (currentMount && !classified) {
+            package = ReadPackageName(currentMount);
+            if (const GroundMount* ground = FindGroundMount(package)) {
+                classified = true;
+                g_groundMount = currentMount;
+                g_backwardRate = ground->backwardSpeed * kBackwardRatePerSpeed;
+                Log("mount package: %s key=0x%08X tick=%llu (controls on, backward speed %.2f m/s)", package.c_str(),
+                    ride.mountKey, now, ground->backwardSpeed);
+            } else if (!reportedUnknown) {
+                reportedUnknown = true;
+                Log("mount package not recognised: '%s' key=0x%08X tick=%llu (mod inactive)", package.c_str(),
+                    ride.mountKey, now);
+            }
+        }
+        if (forceWanted) {
+            forceWanted = false;
+            if (currentMount) {
+                g_groundMount = currentMount;
+                Log("controls forced on: key=0x%08X tick=%llu", ride.mountKey, now);
+                Beep(1200, 200);
             }
         }
         for (int i = 0; i < 2; ++i) {
@@ -938,7 +1082,7 @@ DWORD WINAPI ModThread(void* param) {
                     reinterpret_cast<void*>(ride.rider), reinterpret_cast<void*>(ride.mount));
             }
         }
-        if (ride.mounted) WriteTelemetry(ride);
+        if (ride.mounted) WriteTelemetry(ride, package, marker);
     }
 }
 
