@@ -6,10 +6,6 @@
 //
 // F5        toggle the mod
 // Shift+F5  flip the forward direction
-// Insert    add a numbered marker to the log and CSV
-// PageUp    raise the backward walk's rate
-// PageDown  lower the backward walk's rate
-// End       turn the controls on for the current mount, whatever its package reads as, until the next mount
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -99,14 +95,10 @@ constexpr float kTightSteerSpeed = 2.5f;
 constexpr float kWideSteerSpeed = 5.0f;
 constexpr float kMaxSteerAngle = 85.0f / 57.29578f;
 constexpr float kSteerRampMs = 300.0f;
-// Default for g_backwardRate. Every mount tested moves at about twice its rate in m/s.
-constexpr float kBackwardMoveRate = 0.5f;
+// Converts a speed in m/s to the rate added to the position, because every mount tested moves at about twice its rate.
 constexpr float kBackwardRatePerSpeed = 0.5f;
-constexpr float kBackwardRateStep = 0.1f;
-constexpr float kBackwardRateMin = 0.1f;
-constexpr float kBackwardRateMax = 3.0f;
-constexpr float kBackwardSpeedMin = kBackwardRateMin / kBackwardRatePerSpeed;
-constexpr float kBackwardSpeedMax = kBackwardRateMax / kBackwardRatePerSpeed;
+constexpr float kBackwardSpeedMin = 0.2f;
+constexpr float kBackwardSpeedMax = 6.0f;
 // Reads as forward input for this long, so that the mount leaves idle for a state that uses the walking blend.
 constexpr int kBackwardPulseMs = 150;
 // The backward walk starts once the mount is below this speed in m/s, which is near the end of a stop.
@@ -172,7 +164,7 @@ std::atomic<float> g_mountSpeed{0};
 std::atomic<int> g_steerSide{0};
 std::atomic<ULONGLONG> g_steerStart{0};
 volatile uint64_t* g_rodeoCalls = nullptr;
-std::atomic<float> g_backwardRate{kBackwardMoveRate};
+std::atomic<float> g_backwardRate{kBackwardRatePerSpeed};
 std::atomic<float> g_backwardSteer{kBackwardSteer};
 std::atomic<ULONGLONG> g_backwardPulseEnd{0};
 std::atomic<bool> g_backwardWanted{false};
@@ -652,22 +644,6 @@ bool GameFocused() {
     return pid == GetCurrentProcessId();
 }
 
-// Return whether vk went down since the last call with this was, while the game has focus.
-bool KeyPressed(int vk, bool& was) {
-    const bool down = GameFocused() && KeyDown(vk);
-    const bool pressed = down && !was;
-    was = down;
-    return pressed;
-}
-
-// Change g_backwardRate by delta within its limits, then log and beep.
-void ChangeBackwardRate(float delta) {
-    const float rate = std::clamp(g_backwardRate.load() + delta, kBackwardRateMin, kBackwardRateMax);
-    g_backwardRate = rate;
-    Log("backward rate %.2f tick=%llu", rate, GetTickCount64());
-    Beep(delta > 0 ? 1000 : 700, 80);
-}
-
 // Log the ground mount's chart state when it changes, because the CSV's 10 rows a second can miss short states.
 void LogStateChange() {
     static uint16_t last = 0;
@@ -686,7 +662,7 @@ void LogStateChange() {
     Log("state %04X tick=%llu speed=%.2f", id, GetTickCount64(), haveVelocity ? std::hypot(x, z) : kMissing);
 }
 
-void WriteTelemetry(const Ride& ride, const std::string& package, int marker) {
+void WriteTelemetry(const Ride& ride, const std::string& package) {
     static Vec3 lastPos{};
     static ULONGLONG lastTick = 0, lastFlush = 0;
     static size_t rows = 0;
@@ -726,7 +702,7 @@ void WriteTelemetry(const Ride& ride, const std::string& package, int marker) {
     fprintf(g_csv, ",%llX,%.3f,%.3f,%.3f,%.3f,%.2f", static_cast<unsigned long long>(chartState), chartValue,
             haveVelocity ? velX : kMissing, haveVelocity ? velZ : kMissing,
             haveVelocity ? std::hypot(velX, velZ) : kMissing, haveRider ? riderPos.y : kMissing);
-    fprintf(g_csv, ",%s,%d,%.2f\n", package.c_str(), marker, g_backwardRate.load());
+    fprintf(g_csv, ",%s,%.2f\n", package.c_str(), g_backwardRate.load());
     ++rows;
     if (now - lastFlush > 1000) {
         fflush(g_csv);
@@ -985,7 +961,7 @@ DWORD WINAPI ModThread(void* param) {
               "rider_sync_yaw,mount_sync_yaw,speed,travel_yaw,"
               "i0_applied,i0_stick_x,i0_stick_y,i0_angle,i0_relative,i0_camera_yaw,i0_target_yaw,"
               "i1_applied,i1_stick_x,i1_stick_y,i1_angle,i1_relative,i1_camera_yaw,i1_target_yaw,"
-              "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y,mount_package,marker,backward_rate\n",
+              "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y,mount_package,backward_rate\n",
               g_csv);
     }
     g_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
@@ -1001,8 +977,6 @@ DWORD WINAPI ModThread(void* param) {
     uintptr_t currentMount = 0;
     bool classified = false, reportedUnknown = false;
     ULONGLONG lastTelemetry = 0;
-    bool markerWas = false, fasterWas = false, slowerWas = false, forceWas = false, forceWanted = false;
-    int marker = 0;
     std::string package;
     for (;;) {
         Sleep(10);
@@ -1019,14 +993,6 @@ DWORD WINAPI ModThread(void* param) {
             }
         }
         f5Was = f5;
-        if (KeyPressed(VK_INSERT, markerWas)) {
-            ++marker;
-            Log("marker %d tick=%llu", marker, GetTickCount64());
-            Beep(1500, 80);
-        }
-        if (KeyPressed(VK_PRIOR, fasterWas)) ChangeBackwardRate(kBackwardRateStep);
-        if (KeyPressed(VK_NEXT, slowerWas)) ChangeBackwardRate(-kBackwardRateStep);
-        if (KeyPressed(VK_END, forceWas)) forceWanted = true;
         LogStateChange();
 
         const ULONGLONG now = GetTickCount64();
@@ -1047,7 +1013,6 @@ DWORD WINAPI ModThread(void* param) {
         if (ride.mount != currentMount) {
             currentMount = ride.mount;
             g_groundMount = 0;
-            g_backwardRate = kBackwardMoveRate;
             classified = reportedUnknown = false;
             package.clear();
             if (currentMount) Log("mount appearance: %s", ReadAppearance(currentMount).c_str());
@@ -1066,14 +1031,6 @@ DWORD WINAPI ModThread(void* param) {
                     ride.mountKey, now);
             }
         }
-        if (forceWanted) {
-            forceWanted = false;
-            if (currentMount) {
-                g_groundMount = currentMount;
-                Log("controls forced on: key=0x%08X tick=%llu", ride.mountKey, now);
-                Beep(1200, 200);
-            }
-        }
         for (int i = 0; i < 2; ++i) {
             const uintptr_t actor = g_samples[i].actor.load();
             if (actor != seen[i]) {
@@ -1082,7 +1039,7 @@ DWORD WINAPI ModThread(void* param) {
                     reinterpret_cast<void*>(ride.rider), reinterpret_cast<void*>(ride.mount));
             }
         }
-        if (ride.mounted) WriteTelemetry(ride, package, marker);
+        if (ride.mounted) WriteTelemetry(ride, package);
     }
 }
 

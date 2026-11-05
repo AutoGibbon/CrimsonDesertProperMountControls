@@ -12,7 +12,7 @@ From stage 11, the CSV ends with `mount_package`, `marker` and `backward_rate`. 
 
 From stage 11b, `bin64\HorseSteer_scan_<key>a.txt` and `...b.txt` hold each mount's scan, 5 and 30 seconds after mounting. Each line is a text or RTTI class name and the chain that reached it, such as `mount->+68->+40 inline+18`, with up to 3 chains per name. `HorseSteer.log` records `controls forced on` when End is pressed, and a `mount scan` line for each scan. A forced mount's `mount_package` still shows what `ReadPackageName` read.
 
-From stage 12, the scan files and `mount identity` lines are gone. `HorseSteer.log` adds an `ini` line with the number of values read, a `mount appearance` line per mount, and a `backward release pulse` line at each release. From stage 12b, `backward lost pulse` lines replace the release pulse lines, each with the state it started from.
+From stage 12, the scan files and `mount identity` lines are gone. `HorseSteer.log` adds an `ini` line with the number of values read, a `mount appearance` line per mount, and a `backward release pulse` line at each release. From stage 12b, `backward lost pulse` lines replace the release pulse lines, each with the state it started from. From stage 13, the CSV's `marker` column and the log's `marker`, `backward rate` and `controls forced on` lines are gone.
 
 ## Tests
 
@@ -47,4 +47,5 @@ From stage 12, the scan files and `mount identity` lines are gone. `HorseSteer.l
 | [stage-11b](stage-11b.md) | Memory scan of each mount for a name that works, and the stage 11 steps with a key that forces the controls on | Passed on all 9 non-horse mounts reached, with End. Scans found the package at `+0x18`. Elephant and cucubird not reached |
 | [stage-12](stage-12.md) | Mounts recognised without End, speeds from `HorseSteer.ini`, and a pulse when A or D is released in reverse | Recognition, the `.ini` and speeds passed on 13 mounts, with no lurch. Mounts still lost the backward walk and slid, so the pulse was replaced |
 | [stage-12b](stage-12b.md) | Pulses when the mount's chart value goes missing during the backward walk | Passed on the camel, boar, cucubird, reindeer and horse: slides ended within 0.4 s, with no lurch, including at walls. Cucubird gliding also steers correctly |
+| [stage-13](stage-13.md) | Controls and backward walk with the test keys removed | Passed on the horse and iguana |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |
