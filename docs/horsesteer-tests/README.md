@@ -4,6 +4,8 @@ Give each new test its own file, `stage-N.md`, with its steps and results, and a
 
 ## Logs
 
+Logging is off by default. Before a test, set `Logging=1` under `[Debug]` in `DMM\mods\HorseSteer.ini` and apply in DMM, or the test leaves no logs.
+
 `bin64\HorseSteer.log` records each address lookup, the hook install, mount changes and which actor each input slot belongs to. `bin64\HorseSteer.csv` is written about 10 times a
 second while mounted. Slot `i0` is the rider's input component and `i1` is the horse's. With W held and the mod working, `mount_phys_yaw` and `travel_yaw` stay
 steady while `i0_camera_yaw` changes, and `travel_yaw` is about 180° from `mount_phys_yaw`. `i0_relative` tracks the mount's heading, not 0. `mount_state` is a chart state pointer in hex, 0 if unreadable, and `-9999` marks a missing `mount_value`, velocity or `rider_y`. `rider_y` is the rider's height from its physics position. From stage 10, `speed`, `travel_yaw` and `rider_y` no longer include the chunk origin, so `rider_y` isn't world height, and `speed` can spike for one row if the origin moves. `HorseSteer.log` records each `UpdateBackwardRecovery` pulse with the state it started from and the speed.

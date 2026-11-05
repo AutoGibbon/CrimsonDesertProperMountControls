@@ -54,7 +54,7 @@ The horse's backward walk on these mounts is covered in [backward-walk.md](backw
 - **Other vehicle types without a `Riding_` row:** `Lion`, `Tiger`, `Bull` and `GolemHorse`. `RideOnTiger` is commented out in the package file and `CD_M0002_Bull` has no `RideOn*` slot, so these may be unused. `m0002_ride_bull_upper` exists, but no package uses it.
 - **Donkeys:** 40 character names contain "Donkey", none start with `Riding_`, and `CD_M0002_Donkey` has no `RideOn*` slot, and no donkey record can be written to the save data, so they can't be tested and may not be rideable. `horse/donkey_move` has one backward clip and only a forward speed input.
 - **Warthog:** its ride chart `M0002_Ride_Warthog_Upper` is the `RideOnBoar` slot of `CD_M0002_BattleBoar`, so the `Riding_Warthog_*` rows should use that listed package.
-- **Carriages:** the 74 `Riding_Wagon_*` rows include cow-drawn wagons (`CowFourWheel`) as well as horse-drawn ones, so test both.
+- **Carriages:** the 74 `Riding_Wagon_*` rows include cow-drawn wagons (`CowFourWheel`) as well as horse-drawn ones, so test both. On the test save, the tester found many wagons in the world but no option to steal or mount them. This looks like game progress rather than the mod, though it wasn't checked with the mod off.
 
 ## Leads
 

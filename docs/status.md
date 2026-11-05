@@ -7,7 +7,15 @@ walks the horse backward. On branch `mount-testing`, the controls and backward w
 
 ## Resume here
 
-Work is on branch `mount-testing`. The build in `DMM\mods` matches the source. The Logging, Speed and **Lookups** steps are done, passing [stage 10](horsesteer-tests/stage-10.md) and [stage 10b](horsesteer-tests/stage-10b.md). The mount work in step 2 below is done on every reachable mount, passing [stage 12](horsesteer-tests/stage-12.md), [stage 12b](horsesteer-tests/stage-12b.md) and [stage 13](horsesteer-tests/stage-13.md) on a modified save with a range of mounts. Carriages in step 3 are next, and first need the tester to drive one, so that the log shows its package. The freeze after a won minigame is accepted, with a remount as the workaround, and no further work is planned on it (evidence in `findings/stability.md`). `kStateWalk` and the other state constants stay as low pointer bits for the horse and ibex: a missing `mount_value` catches most lost walks, but not `8FC`, whose value is 0, and failure only disables that part of the recovery.
+Work is on branch `mount-testing`. The build in `DMM\mods` matches the source. The Logging, Speed and **Lookups** steps are done, passing [stage 10](horsesteer-tests/stage-10.md) and [stage 10b](horsesteer-tests/stage-10b.md). The mount work in step 2 below is done on every reachable mount, passing [stage 12](horsesteer-tests/stage-12.md), [stage 12b](horsesteer-tests/stage-12b.md) and [stage 13](horsesteer-tests/stage-13.md) on a modified save with a range of mounts. Logging is now behind `Logging` in `HorseSteer.ini`, off by default. That change compiles but hasn't run in game, so check it at the next launch.
+
+Carriages in step 3 are next, but they're blocked: the test save shows wagons with no option to steal or mount them. The tester plans to get another save from community resources, or progress the current one. To resume:
+
+1. In DMM, turn `HorseSteer` off and on again and apply, so that `bin64` gets the current build. Check that with `Logging=0` no `HorseSteer.log` or new CSV appears and the controls still work. `HorseSteer.csv` from earlier runs may still be there, so go by its date.
+2. Once a wagon can be mounted, set `Logging=1` in `DMM\mods\HorseSteer.ini` and apply. Drive one for about a minute with W, A, D and S while moving the camera, and try a cow-drawn one too. No new build is needed, because the mod stays inactive on a package it doesn't recognise.
+3. Read `mount package` and `mount appearance` in the log and the CSV. Then add the wagon's package to a test build, to find out whether replacing the camera vectors steers it.
+
+If another save is used, its mount keys and available mounts may differ, and a stale `bin64\dmm\manifest.tsv` is the first thing to check if it won't load. The freeze after a won minigame is accepted, with a remount as the workaround, and no further work is planned on it (evidence in `findings/stability.md`). `kStateWalk` and the other state constants stay as low pointer bits for the horse and ibex: a missing `mount_value` catches most lost walks, but not `8FC`, whose value is 0, and failure only disables that part of the recovery.
 
 The start of the backward walk is otherwise fine at `kBackwardMaxStartSpeed` 0.2: it came slightly later than the times in `findings/backward-walk.md`, and the tester reported no problem.
 
@@ -26,4 +34,4 @@ The start of the backward walk is otherwise fine at `kBackwardMaxStartSpeed` 0.2
 3. Investigate carriages, which should get similar controls if possible. This is expected to be separate work, with its own round of probe logging and code execution
    capture. They aren't in `g_groundMounts`, and the wagon has its own charts (`r0012_wagon_upper`, which reads `key_brake`, and `ride_carriage_lower` and
    `ride_carriage_upper`). The first question is whether replacing the camera vectors applies to them.
-4. Remove the CSV and other test logging for release.
+4. Before release, decide whether the CSV and detailed log lines stay behind `Logging` or go. Failed lookups currently leave no trace with `Logging=0`, so consider always writing a short log. Also add a speed limit to the horse's state-ID recovery in `UpdateBackwardRecovery`, which pulses once a second when the horse is stopped against something. Keep the limit below the 0.8 to 0.91 m/s where it still fires usefully.

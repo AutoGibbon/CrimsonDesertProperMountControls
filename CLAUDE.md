@@ -41,7 +41,8 @@ deletes its logs, so copy them to `scratch/probe-runs/` first. If a save won't l
 
 ## Working notes
 
-- **Tests:** write each new test as a new file in `docs/horsesteer-tests/`, which also explains the logs.
+- **Tests:** write each new test as a new file in `docs/horsesteer-tests/`, which also explains the logs. `HorseSteer` only logs with
+  `Logging=1` in `HorseSteer.ini`, and the file in `src/` ships with it off, so a test's setup must turn it on.
 - **Mods:** other mods stay enabled during tests unless the tester agrees otherwise.
 - **Updates:** the game can update at any launch, and Steam's update setting doesn't prevent it.
 - **Static analysis:** `tools/disasm.py` reads the on-disk exe, and addresses in `.sxdata` disassemble cleanly there, so

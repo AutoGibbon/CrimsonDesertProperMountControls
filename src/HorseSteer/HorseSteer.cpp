@@ -954,8 +954,11 @@ bool InstallHook() {
 
 DWORD WINAPI ModThread(void* param) {
     const std::wstring dir = ModuleDir(static_cast<HMODULE>(param));
-    g_log = _wfsopen((dir + L"\\HorseSteer.log").c_str(), L"w", _SH_DENYNO);
-    g_csv = _wfsopen((dir + L"\\HorseSteer.csv").c_str(), L"w", _SH_DENYNO);
+    const std::wstring settings = dir + L"\\HorseSteer.ini";
+    if (GetPrivateProfileIntW(L"Debug", L"Logging", 0, settings.c_str()) != 0) {
+        g_log = _wfsopen((dir + L"\\HorseSteer.log").c_str(), L"w", _SH_DENYNO);
+        g_csv = _wfsopen((dir + L"\\HorseSteer.csv").c_str(), L"w", _SH_DENYNO);
+    }
     if (g_csv) {
         fputs("tick_ms,w,a,s,d,enabled,flip,mounted,mount_key,forward_from_mount,rider_phys_yaw,mount_phys_yaw,"
               "rider_sync_yaw,mount_sync_yaw,speed,travel_yaw,"
@@ -966,7 +969,7 @@ DWORD WINAPI ModThread(void* param) {
     }
     g_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
 
-    LoadSettings(dir + L"\\HorseSteer.ini");
+    LoadSettings(settings);
 
     // Other mods report crashes when hooking during the first seconds of launch.
     Sleep(20000);
@@ -993,7 +996,7 @@ DWORD WINAPI ModThread(void* param) {
             }
         }
         f5Was = f5;
-        LogStateChange();
+        if (g_log) LogStateChange();
 
         const ULONGLONG now = GetTickCount64();
         if (now - lastTelemetry < 100) continue;
