@@ -4,7 +4,7 @@ Give each new test its own file, `stage-N.md`, with its steps and results, and a
 
 ## Logs
 
-Tracing is off by default. Before a test, set `Logging=1` under `[Debug]` in `DMM\mods\HorseSteer.ini` and apply in DMM, or the test leaves no logs. With `Logging=0`, `HorseSteer.log` only exists if the mod had a problem at startup, such as a failed lookup, and launching deletes the log and CSV from any earlier run.
+Tracing is off by default. Before a test, set `Logging=1` under `[Debug]` in `bin64\HorseSteer.ini`, or the test leaves no logs. DMM doesn't copy the ini from `DMM\mods`, so editing that copy has no effect. With `Logging=0`, `HorseSteer.log` only exists if the mod had a problem at startup, such as a failed lookup, and launching deletes the log and CSV from any earlier run.
 
 `bin64\HorseSteer.log` records each address lookup, the hook install, mount changes and which actor each input slot belongs to. `bin64\HorseSteer.csv` is written about 10 times a
 second while mounted. Slot `i0` is the rider's input component and `i1` is the horse's. With W held and the mod working, `mount_phys_yaw` and `travel_yaw` stay
@@ -50,4 +50,6 @@ From stage 12, the scan files and `mount identity` lines are gone. `HorseSteer.l
 | [stage-12](stage-12.md) | Mounts recognised without End, speeds from `HorseSteer.ini`, and a pulse when A or D is released in reverse | Recognition, the `.ini` and speeds passed on 13 mounts, with no lurch. Mounts still lost the backward walk and slid, so the pulse was replaced |
 | [stage-12b](stage-12b.md) | Pulses when the mount's chart value goes missing during the backward walk | Passed on the camel, boar, cucubird, reindeer and horse: slides ended within 0.4 s, with no lurch, including at walls. Cucubird gliding also steers correctly |
 | [stage-13](stage-13.md) | Controls and backward walk with the test keys removed | Passed on the horse and iguana |
+| [stage-14](stage-14.md) | Controls and backward walk on wagons | Passed. Reverse steering was poor, as with the game's brake key |
+| [stage-15](stage-15.md) | S as the wagon's brake reverse, reverse steering ramp | Brake reverse passed. The ramp delayed the horse's reverse steering by about 0.44 s, so it was removed |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

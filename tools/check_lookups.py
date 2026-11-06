@@ -31,6 +31,11 @@ SIGNATURES = {
         "48 8B 41 20 83 78 28 00",
         -14,
     ),
+    # A call to the chart condition handler table's getter.
+    "conditionTableCall": (
+        "E8 ?? ?? ?? ?? 81 FB 86 02 00 00 73 ?? 8D 8B 7D FF FF FF 48 8D 1C CD 00 00 00 00 48 83 3C 03 00",
+        0,
+    ),
 }
 
 # mov rax,[rip+x]; mov rcx,[rax+0x30]
@@ -48,6 +53,7 @@ KNOWN = {
         "hookSite": 0xB6C4A6,
         "stickSite": 0xB6C5A6,
         "keyCheck": 0x3B0150,
+        "conditionTableCall": 0x3AA19C,
     },
     0x6AEA07A6: {  # Steam build 26423880
         "vtActorManager": 0x5944B38,
@@ -58,6 +64,7 @@ KNOWN = {
         "hookSite": 0xB6D526,
         "stickSite": 0xB6D626,
         "keyCheck": 0x3B0750,
+        "conditionTableCall": 0x3AA79C,
     },
 }
 

@@ -38,6 +38,10 @@ the slide and drift states, and its skill conditions, with conditions decoded.
   hooks it at runtime. It returns 0 when the key is pressed: the game's answer was 1 except during brief presses, and answering 0
   on S started drifts in game. Replacing the table slot worked alongside the existing hook. That code was removed with the brake and is saved in
   `scratch/probe-runs/stage5-brake/s-brake.patch`.
+- **Condition table on later builds:** the getter is Denuvo-mutated on every build, so `HorseSteer` finds it through
+  a call in the condition dispatcher, `g_conditionTableCall`, which also checks the type is below `0x286`. On build
+  `0x6AEB7D59` the getter is `0x3AA5C0` and the key handler `0x3B0750`. Replacing the slot works there alongside the
+  other mod's hook, and on the wagon the actor at the context's `+8` is the wagon ([stage 15](../horsesteer-tests/stage-15.md)).
 - **Installed mods:** Combat Evolved swaps riding charts such as `ride_upper` and `ride_weapon_upper`, and its strings show
   no movement or steering code. It logs a game key check at `exe+0x3B0150` on this build, which may help with reading
   game input.

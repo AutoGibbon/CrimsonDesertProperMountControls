@@ -32,10 +32,11 @@ the finished probe's docs.
 ```bash
 cmake -S src/HorseSteer -B build/HorseSteer -G "Visual Studio 17 2022" -A x64
 cmake --build build/HorseSteer --config Release
-cp build/HorseSteer/Release/HorseSteer.asi src/HorseSteer/HorseSteer.ini "E:/Tools/mods/crimson desert/DMM/mods/"
+cp build/HorseSteer/Release/HorseSteer.asi "E:/Tools/mods/crimson desert/DMM/mods/"
 ```
 
-The tester then turns `HorseSteer` off and on in DMM and applies, so that the new build is copied to `bin64`. Disabling it
+The tester then turns `HorseSteer` off and on in DMM and applies, so that the new build is copied to `bin64`. DMM doesn't
+copy `HorseSteer.ini` from `DMM\mods`, so put settings changes in the game's `bin64\HorseSteer.ini` directly. Disabling it
 deletes its logs, so copy them to `scratch/probe-runs/` first. If a save won't load, check for a stale
 `bin64\dmm\manifest.tsv` before suspecting the mod (see `docs/findings/stability.md`).
 

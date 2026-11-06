@@ -1,8 +1,8 @@
 // Horse-relative riding controls: on ground mounts, replaces the camera direction vectors in
 // ClientInputActorComponent's per-frame update with the mount's, so move input is resolved against the mount's facing.
 // Also widens and ramps in forward steering angles, and removes backward input, which leaves S with a steering input as
-// a pivot. S also walks the mount backward from a near stop. All of this stops while the taming minigame runs, because it
-// needs the game's own input directions.
+// a pivot. S also walks the mount backward from a near stop, or on mounts with a built-in reverse, acts as the game's
+// brake key. All of this stops while the taming minigame runs, because it needs the game's own input directions.
 //
 // F5        toggle the mod
 // Shift+F5  flip the forward direction
@@ -51,6 +51,14 @@ constexpr Signature kKeyCheckSignature{
     "48 8B 41 20 83 78 28 00",
     -14};
 constexpr uint8_t kKeyCheckBytes[] = {0x48, 0x83, 0xEC, 0x28, 0x48, 0x8B, 0x02, 0x8B, 0x50, 0x08};
+// A call to the function that returns the chart condition handler table, in the code that checks a condition type is
+// below 0x286 and indexes the table by type - 0x83.
+constexpr Signature kConditionTableCallSignature{
+    "E8 ?? ?? ?? ?? 81 FB 86 02 00 00 73 ?? 8D 8B 7D FF FF FF 48 8D 1C CD 00 00 00 00 48 83 3C 03 00", 0};
+constexpr size_t kKeyConditionSlot = 0xEA - 0x83;
+constexpr uint32_t kKeyBrakeHash = 0x377B9DB8;
+// Chart condition handlers return 0 when the condition holds.
+constexpr uint8_t kConditionHolds = 0;
 // mov rax,[rip+x]; mov rcx,[rax+0x30], which loads the WorldSystem global far more often than any other global.
 constexpr const char* kWorldReferenceSignature = "48 8B 05 ?? ?? ?? ?? 48 8B 48 30";
 constexpr int kWorldMinRatio = 3;
@@ -71,13 +79,16 @@ constexpr uint32_t kInput_MoveAngleRelative = 0x8C;
 constexpr uint32_t kInput_CameraForward = 0x154;
 constexpr uint32_t kInput_CameraRight = 0x160;
 
-// A land mount's package and its backward walk speed in m/s, which LoadSettings can replace from HorseSteer.ini.
+// A land mount's package, its backward walk speed in m/s, which LoadSettings can replace from HorseSteer.ini, and whether
+// S reverses it with the game's brake key instead of the backward walk.
 struct GroundMount {
     const char* package;
     float backwardSpeed;
+    bool brakeReverse = false;
 };
 
-// Water mounts, the dragon and machines are left out. The elephant's and other wolf packages' speeds are untuned.
+// Water mounts, the dragon and machines are left out. The elephant's, the wagon's and other wolf packages' speeds are
+// untuned.
 GroundMount g_groundMounts[] = {
     {"CD_R0001_Horse", 1.0f},          {"CD_M0002_Camel", 1.9f},
     {"CD_M0002_Reindeer", 1.2f},       {"CD_M0002_Elephant", 1.0f},
@@ -85,7 +96,7 @@ GroundMount g_groundMounts[] = {
     {"CD_M0002_Wolf", 1.8f},           {"CD_M0002_Wolf_Elite", 1.7f},
     {"CD_M0002_Wolf_Elite_Big", 1.8f}, {"CD_M0002_Wolf_Boss", 1.8f},
     {"CD_R0034_Iguana", 1.2f},         {"CD_R0035_CarmaBirdsaurus", 1.6f},
-    {"CD_M0003_CucuBird", 1.0f},
+    {"CD_M0003_CucuBird", 1.0f},       {"CD_R0012_Wagon_0001", 1.0f, true},
 };
 
 // Forward steering multiplies W+A's 45 degree stick angle by these, blending between the two speeds in m/s.
@@ -95,6 +106,8 @@ constexpr float kTightSteerSpeed = 2.5f;
 constexpr float kWideSteerSpeed = 5.0f;
 constexpr float kMaxSteerAngle = 85.0f / 57.29578f;
 constexpr float kSteerRampMs = 300.0f;
+// A raw stick below this Y counts as backward input. Above it, a negative Y is cleared so that it steers like A or D.
+constexpr float kBackwardStickY = -0.5f;
 // Converts a speed in m/s to the rate added to the position, because every mount tested moves at about twice its rate.
 constexpr float kBackwardRatePerSpeed = 0.5f;
 constexpr float kBackwardSpeedMin = 0.2f;
@@ -156,6 +169,7 @@ uintptr_t g_vtRodeoUi = 0;
 uintptr_t g_hookSite = 0;
 uintptr_t g_stickSite = 0;
 uintptr_t g_keyCheck = 0;
+uintptr_t g_conditionTableCall = 0;
 std::atomic<bool> g_enabled{true};
 std::atomic<bool> g_flip{false};
 InputSample g_samples[2];
@@ -171,6 +185,12 @@ std::atomic<float> g_backwardSteer{kBackwardSteer};
 std::atomic<ULONGLONG> g_backwardPulseEnd{0};
 std::atomic<bool> g_backwardWanted{false};
 std::atomic<bool> g_backwardWalking{false};
+// The ground mount that S reverses with the brake key, or 0, and whether S is braking it.
+std::atomic<uintptr_t> g_brakeMount{0};
+std::atomic<bool> g_braking{false};
+
+using ConditionHandler = uint8_t (*)(uintptr_t, uintptr_t*, void*, void*, uint8_t, void*, void*);
+ConditionHandler g_keyCondition = nullptr;
 
 const IMAGE_NT_HEADERS* GameHeaders();
 
@@ -400,7 +420,7 @@ std::string ReadAppearance(uintptr_t mount) {
     return second ? ReadText(second + 0x18) : std::string();
 }
 
-// Replace the backward speeds and reverse steering input with any values in the ini at path, and log what's in use.
+// Replace the backward speeds and reverse steering settings with any values in the ini at path, and log what's in use.
 void LoadSettings(const std::wstring& path) {
     wchar_t text[32];
     const auto read = [&](const wchar_t* section, const wchar_t* key, float& value, float low, float high) {
@@ -435,12 +455,32 @@ bool RidingGroundMount(const Ride& ride) {
     return g_enabled.load() && ride.mounted && ride.mount != 0 && ride.mount == g_groundMount.load() && !RodeoActive();
 }
 
-// Return how far steering has ramped in, from 0 to 1, restarting when stickX starts steering or changes direction.
-float SteerRamp(float stickX) {
+// Return the milliseconds stickX has steered to one side, restarting when it starts steering or changes direction.
+float SteerHeldMs(float stickX) {
     const int side = stickX > 0.01f ? 1 : stickX < -0.01f ? -1 : 0;
     const ULONGLONG now = GetTickCount64();
     if (side != g_steerSide.exchange(side)) g_steerStart = now;
-    return std::min(static_cast<float>(now - g_steerStart.load()) / kSteerRampMs, 1.0f);
+    return static_cast<float>(now - g_steerStart.load());
+}
+
+// Return how far steering has ramped in over durationMs, from 0 to 1.
+float SteerRamp(float heldMs, float durationMs) {
+    return durationMs > 0.0f ? std::min(heldMs / durationMs, 1.0f) : 1.0f;
+}
+
+// Return whether a raw stick reads like keys: each axis at 0 or full, or both axes equal and large, as on a diagonal.
+bool DigitalStick(float x, float y) {
+    const float ax = std::fabs(x), ay = std::fabs(y);
+    const auto keyAxis = [](float v) { return v < 0.001f || v > 0.999f; };
+    return (keyAxis(ax) && keyAxis(ay)) || (std::fabs(ax - ay) < 0.001f && ax > 0.7f);
+}
+
+// Log the raw stick each time steering input changes between digital and analog.
+void LogStickKind(float x, float y, bool digital) {
+    static std::atomic<int> last{-1};
+    if (last.exchange(digital ? 1 : 0) != (digital ? 1 : 0)) {
+        Log("stick input %s: %.3f, %.3f", digital ? "digital" : "analog", x, y);
+    }
 }
 
 // Steer a forward stick vector further from straight ahead, by more at low speed, scaling the angle by ramp and keeping
@@ -588,29 +628,54 @@ void UpdateBackwardRecovery(const Ride& ride, bool steering) {
     Log("backward recovery pulse from state %04X at speed %.2f", id, g_mountSpeed.load());
 }
 
+// Set g_braking from backward input on a g_brakeMount, and log when it changes.
+void UpdateBraking(bool braking) {
+    if (g_braking.exchange(braking) != braking) Log("brake reverse %s", braking ? "on" : "off");
+}
+
 // Adjust the raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
-// and widen forward steering. S alone starts the backward walk, and A or D during it steers.
+// and widen forward steering. S alone starts the backward walk, and A or D during it steers. On g_brakeMount, S brakes
+// instead, which the chart takes as reverse, and A or D pass through unchanged as they do with the brake key. Forward
+// steering ramps in only for digital input, as an analog stick already moves gradually.
 void OnStickRead(SafetyHookContext& ctx) {
     const Ride ride = ResolveRide();
     if (!RidingGroundMount(ride)) {
         g_backwardWanted = false;
         g_backwardWalking = false;
+        UpdateBraking(false);
         return;
     }
     float velX = 0, velZ = 0;
     if (ReadVelocity(ride.mount, velX, velZ)) g_mountSpeed = std::hypot(velX, velZ);
     float stick[2];
     if (!SafeRead(ctx.rdi + kInput_RawStick, stick, sizeof stick)) return;
-    const float ramp = SteerRamp(stick[0]);
-    const bool backward = stick[1] < 0.0f;
+    const float heldMs = SteerHeldMs(stick[0]);
+    const bool backward = stick[1] < kBackwardStickY;
     const bool steering = std::fabs(stick[0]) > 0.01f;
+    const bool digital = DigitalStick(stick[0], stick[1]);
+    if (steering) LogStickKind(stick[0], stick[1], digital);
+    const bool brakeMount = ride.mount == g_brakeMount.load();
+    UpdateBraking(brakeMount && backward);
+    if (brakeMount && backward) {
+        UpdateBackwardPulse(false);
+        stick[1] = 0.0f;
+        SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
+        return;
+    }
     const bool reverseSteering = backward && steering && g_backwardWalking.load();
     const bool pulse = UpdateBackwardPulse(backward && (!steering || reverseSteering));
     UpdateBackwardRecovery(ride, steering);
     if (backward) {
+        if (reverseSteering) {
+            // Scale by the stick's sideways push relative to its backward push, which is 1 for keys and diagonals.
+            const float share = std::fabs(stick[0]) / std::max(std::fabs(stick[0]), std::fabs(stick[1]));
+            stick[0] = std::copysign(g_backwardSteer.load() * share, stick[0]);
+        }
         stick[1] = pulse ? 1.0f : 0.0f;
-        if (reverseSteering) stick[0] = std::copysign(g_backwardSteer.load(), stick[0]);
-    } else if (stick[1] > 0.0f && std::fabs(stick[0]) > 0.01f) {
+    } else if (stick[1] < 0.0f) {
+        stick[1] = 0.0f;
+    } else if (stick[1] > 0.0f && steering) {
+        const float ramp = digital ? SteerRamp(heldMs, kSteerRampMs) : 1.0f;
         WidenSteering(stick[0], stick[1], g_mountSpeed.load(), ramp);
     } else {
         return;
@@ -665,6 +730,62 @@ void LogKeyCheckBytes() {
         }
         Log("key check jumps to %p in %ls", reinterpret_cast<void*>(target), path);
     }
+}
+
+// Answer g_brakeMount's key_brake condition as held while g_braking is set, and otherwise return the game's answer.
+uint8_t OnKeyCondition(uintptr_t context, uintptr_t* condition, void* a3, void* a4, uint8_t a5, void* a6, void* a7) {
+    const uint8_t result = g_keyCondition(context, condition, a3, a4, a5, a6, a7);
+    if (!g_braking.load()) return result;
+    uintptr_t conditionData = 0;
+    uint32_t hash = 0;
+    if (!Read(reinterpret_cast<uintptr_t>(condition), conditionData) || !Read(conditionData + 8, hash) ||
+        hash != kKeyBrakeHash) {
+        return result;
+    }
+    uintptr_t actor = 0;
+    Read(context + 8, actor);
+    // Log the first few actors that read key_brake while braking, to show which chart takes the brake.
+    static std::atomic<uintptr_t> logged[4];
+    static std::atomic<int> loggedCount{0};
+    if (g_logging && loggedCount.load() < 4 &&
+        std::none_of(logged, logged + 4, [actor](const auto& seen) { return seen.load() == actor; })) {
+        logged[loggedCount.fetch_add(1) & 3] = actor;
+        Log("key_brake read for actor %p, brake mount %p, game answers %d", reinterpret_cast<void*>(actor),
+            reinterpret_cast<void*>(g_brakeMount.load()), result);
+    }
+    return actor != 0 && actor == g_brakeMount.load() ? kConditionHolds : result;
+}
+
+// Return the key condition's slot in the chart condition handler table, or null if it doesn't hold g_keyCheck.
+uintptr_t* FindKeyConditionSlot() {
+    __try {
+        int32_t offset = 0;
+        memcpy(&offset, reinterpret_cast<const void*>(g_base + g_conditionTableCall + 1), sizeof offset);
+        const auto getTable = reinterpret_cast<uintptr_t* (*)()>(g_base + g_conditionTableCall + 5 + offset);
+        uintptr_t* table = getTable();
+        return table && table[kKeyConditionSlot] == g_base + g_keyCheck ? &table[kKeyConditionSlot] : nullptr;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return nullptr;
+    }
+}
+
+// Replace the key condition's handler table slot with OnKeyCondition, which calls the original, so that another mod's
+// hook on the handler itself still runs. Without it, S uses the backward walk on every mount.
+void InstallBrakeKey() {
+    uintptr_t* slot = g_keyCheck && g_conditionTableCall ? FindKeyConditionSlot() : nullptr;
+    if (!slot) {
+        LogProblem("brake key: condition table not found, so S uses the backward walk on every mount");
+        return;
+    }
+    DWORD oldProtect = 0;
+    if (!VirtualProtect(slot, sizeof(uintptr_t), PAGE_READWRITE, &oldProtect)) {
+        LogProblem("brake key: table protection failed, so S uses the backward walk on every mount");
+        return;
+    }
+    g_keyCondition = reinterpret_cast<ConditionHandler>(*slot);
+    *slot = reinterpret_cast<uintptr_t>(&OnKeyCondition);
+    VirtualProtect(slot, sizeof(uintptr_t), oldProtect, &oldProtect);
+    Log("brake key installed at table slot %p", static_cast<void*>(slot));
 }
 
 bool KeyDown(int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
@@ -946,8 +1067,8 @@ bool LookupWorldSystemSlot() {
     return true;
 }
 
-// Run every lookup and log each result. Return whether the mod can run. The key check is left out of that, and only runs
-// when Logging is on, because it's only diagnostics.
+// Run every lookup and log each result. Return whether the mod can run. The key check and condition table are left out
+// of that, because without them only the brake reverse is lost.
 bool RunLookups() {
     const ULONGLONG start = GetTickCount64();
     bool ok = LookupVtable("vtActorManager", kClassActorManager, g_vtActorManager);
@@ -956,7 +1077,8 @@ bool RunLookups() {
     ok &= LookupWorldSystemSlot();
     ok &= LookupSignature("hookSite", kHookSiteSignature, g_hookSite);
     ok &= LookupSignature("stickSite", kStickSiteSignature, g_stickSite);
-    if (g_logging) LookupSignature("keyCheck", kKeyCheckSignature, g_keyCheck);
+    LookupSignature("keyCheck", kKeyCheckSignature, g_keyCheck);
+    LookupSignature("conditionTableCall", kConditionTableCallSignature, g_conditionTableCall);
     Log("lookups took %llu ms", GetTickCount64() - start);
     return ok;
 }
@@ -977,7 +1099,8 @@ bool InstallHook() {
     Log("hooks installed at exe+0x%llX and exe+0x%llX", static_cast<unsigned long long>(g_hookSite),
         static_cast<unsigned long long>(g_stickSite));
     InstallRodeoSwitch();
-    if (g_keyCheck) LogKeyCheckBytes();
+    if (g_keyCheck && g_logging) LogKeyCheckBytes();
+    InstallBrakeKey();
     return true;
 }
 
@@ -1052,6 +1175,7 @@ DWORD WINAPI ModThread(void* param) {
         if (ride.mount != currentMount) {
             currentMount = ride.mount;
             g_groundMount = 0;
+            g_brakeMount = 0;
             classified = reportedUnknown = false;
             package.clear();
             if (currentMount) Log("mount appearance: %s", ReadAppearance(currentMount).c_str());
@@ -1062,8 +1186,10 @@ DWORD WINAPI ModThread(void* param) {
                 classified = true;
                 g_groundMount = currentMount;
                 g_backwardRate = ground->backwardSpeed * kBackwardRatePerSpeed;
-                Log("mount package: %s key=0x%08X tick=%llu (controls on, backward speed %.2f m/s)", package.c_str(),
-                    ride.mountKey, now, ground->backwardSpeed);
+                const bool brake = ground->brakeReverse && g_keyCondition;
+                if (brake) g_brakeMount = currentMount;
+                Log("mount package: %s key=0x%08X tick=%llu (controls on, backward speed %.2f m/s, reverse by %s)",
+                    package.c_str(), ride.mountKey, now, ground->backwardSpeed, brake ? "brake key" : "backward walk");
             } else if (!reportedUnknown) {
                 reportedUnknown = true;
                 Log("mount package not recognised: '%s' key=0x%08X tick=%llu (mod inactive)", package.c_str(),

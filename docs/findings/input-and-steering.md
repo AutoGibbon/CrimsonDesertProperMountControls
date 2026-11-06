@@ -53,6 +53,14 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
 - **Steering tuning:** stage 4 passed in game, and the tester rated `kSteerRampMs`, `kTightSteerFactor` and `kWideSteerFactor`
   about right, so leave them as they are.
 
+- **Raw keyboard values (stage 14 to 15):** the raw stick at `+0x48` reads 0 or ±1 on each axis, including diagonals, such
+  as (−1, 1) for W with A. `DigitalStick` treats those, and equal axes above 0.7, as keys, so the forward ramp skips a stick.
+  Gamepad input hasn't been logged.
+- **Reverse steering ramp (removed):** ramping A or D during the backward walk from 0 to `SteerInput` over 0.4 s delayed the
+  horse's steering state `A56E` by about 437 ms on all 3 presses in stage 15, against 0 ms in stage 13. The stick logged
+  about 0 until the ramp ended, so the horse got no gradual turn. On the wagon the same ramp logged values in between. The
+  difference is untraced. Reverse turn rates don't follow the input size, so the ramp was removed.
+
 ## Taming minigame
 
 - **Input:** it needs input pointing at the mount's tail, and it reads the movement data the mod edits: holding S wins it

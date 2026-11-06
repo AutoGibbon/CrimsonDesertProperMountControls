@@ -20,7 +20,8 @@ for new offsets, or port them with its `PORTING-3479.md` method using `scratch/e
 | `g_vtVehicleComponent` | `0x5944B90` | RTTI | `ClientVehicleActorComponent` vtable |
 | `g_hookSite` | `0xB6D526` | Signature | Input update, right after the camera vectors are copied |
 | `g_stickSite` | `0xB6D626` | Signature | Input update, right before the raw stick is read from `+0x48` |
-| `g_keyCheck` | `0x3B0750` | Signature, not required | Chart key condition handler, type `0xEA`. Only logged at startup, to detect runtime patches |
+| `g_keyCheck` | `0x3B0750` | Signature, not required | Chart key condition handler, type `0xEA`. `InstallBrakeKey` checks the table slot holds it |
+| `g_conditionTableCall` | `0x3AA79C` | Signature, not required | A call to the chart condition handler table's getter, `0x3AA5C0`, which is Denuvo-mutated. Found in [stage 15](../horsesteer-tests/stage-15.md) |
 | `g_vtRodeoUi` | `0x5A75218` | RTTI | `UIGamePlayControlRootMiniGameRodeo` vtable; slot 47 runs each frame of the minigame |
 
 ```text
