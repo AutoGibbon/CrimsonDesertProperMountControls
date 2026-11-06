@@ -19,14 +19,14 @@ Work is on `main` and committed. The build in `DMM\mods` matches the source. DMM
 
 **Next session: publishing.** The mod is feature complete for a first release. Start with the open items in "Before
 release", then the release itself. Still to decide with the user: where it's published (Nexus, GitHub or both) and what
-goes out (a player-facing readme, a zip of `HorseSteer.asi` and `HorseSteer.ini`, or both). The `.ini` in `src/`
-ships with `Logging=0`. The player-facing readme should cover the controls (F5 toggle, Shift+F5 flip), the `.ini`
+goes out (a player-facing readme, a zip of `HorseSteer.asi` and `HorseSteer.ini`, or both). The player-facing readme should cover the controls (F5 toggle, Shift+F5 flip), the `.ini`
 settings, the mounts supported and the known limitations below.
 
 ## Before release
 
 1. **Recovery speed limit:** done, passed [stage 18](horsesteer-tests/stage-18.md).
-2. **`Logging=0`:** check that the controls work and that launching leaves no `HorseSteer.log` or `HorseSteer.csv` in
+2. **`Logging=0`:** `src/HorseSteer/HorseSteer.ini` has `Logging=1`, so set it to 0 for release. Then check that the
+   controls work and that launching leaves no `HorseSteer.log` or `HorseSteer.csv` in
    `bin64`.
 3. **Exe baseline:** copy the current exe (`0x6AED2E85`) to `scratch/exe-baseline/` and add it to `KNOWN` in
    `tools/check_lookups.py`. The `0x6AEB7D59` exe can no longer be copied.
