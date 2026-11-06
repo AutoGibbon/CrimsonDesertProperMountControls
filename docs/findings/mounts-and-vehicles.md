@@ -71,11 +71,29 @@ Build `0x6AEB7D59`. Tested on `cd_r0004_05_wagon` in [stage 14](../horsesteer-te
 - **Brake key with A or D:** the wagon stays in `E14A` and turns at about 55 to 60°/s while backing, and its travel drifts
   60 to 80° off straight back. The mod-off run, with taps of 0.3 s or less, turned at about 40 to 50°/s with up to 60°
   drift. This is the game's own behaviour, and the tester rated it poor.
-- **Folding in reverse:** while the animal is in line with the wagon, it pushes through the harness and both back up.
-  A or D turns the animal off the wagon's axis, so the push stops, the animal backs into the wagon and the two circle in
-  place. At 55 to 60°/s a small angle can't be held by hand, so whether one backs along a curve isn't known. The mount
-  actor is the wagon, so `mount_phys_yaw` is the wagon's heading. The animal's actor hasn't been found, and in stage 15
-  only the wagon's actor read `key_brake`.
+- **Movement is a root transform, not wheel physics:** the chart moves and turns the mount actor's transform directly,
+  and `mount_phys_yaw` is that root's heading. It points along the horse: after a tap of A the horse sits at an angle to
+  the wagon body and the path runs straight back from the horse, along `mount_phys_yaw`. The wagon body holds that angle
+  while reversing, and colliders can move it. With A held, the root turns at 60°/s and the two circle in place. Only the
+  wagon's actor reads `key_brake`, and the wagon's prefab holds only its body and harness.
+- **Wagon body angle not found (stage 17):** no rotation reachable within 3 pointers of the wagon, the horse, or their
+  physics objects showed the body's angle to the horse. Every rotation that moved followed `mount_phys_yaw`. The wagon's
+  Havok file (`cd_r0004_05_wagon_0001_vehicle.hkx`) has bodies for the axles, suspension and wheels joined by
+  `hkRagdollConstraint`, `hkWheelConstraint` and `hkFixedConstraint`, and no horse body, so the body angle is probably
+  one of those bodies. Searching for it was stopped, and the wagon's reverse steering is accepted as the game's.
+- **Turn in `E14A` (stage 15 CSV):** the wagon doesn't stop. Within about 0.6 s of A or D, `mount_vel` falls from 1.0
+  to 0.5 m/s and stays there, while `mount_phys_yaw` turns at a steady 58 to 60°/s from the first row. That's a circle
+  of about 0.5 m radius. With D held for 6 s the wagon turned a full 360° at that rate. In one run with A held, the rate
+  fell to about 8°/s after 2.3 s and 140°. In straight reverse, `travel_yaw` matches `mount_phys_yaw`.
+- **Taps in `E14A` ([stage 16](../horsesteer-tests/stage-16.md)):** A held for 0.2 to 0.3 s turns the wagon 15 to 18°,
+  and a shorter tap 9°. The rate ramps to 60°/s over about 0.3 s and back to 0 over about 0.3 s after release, speed
+  dips to about 0.8 m/s, and the wagon then reverses straight along its new heading. Holding A gives 62°/s while speed
+  falls to 0.5 m/s.
+- **The animal (stage 16):** a `cd_r0001_horse` actor whose key is the wagon's plus 2. The driver NPC is the wagon's key
+  plus 1, with a vehicle link to the wagon at seat 0. The horse's vehicle link is empty, and it holds the wagon's key at
+  `+0xAC`. The wagon's `+0xB0` points to a list with the driver's key at `+0x0` and the horse's at `+0x4`. The horse's
+  physics object (`actor+0x68->+0x40->+0x140->+0x2C0`) reads as the wagon's position and heading, so its visible angle
+  to the wagon comes from somewhere else.
 - **Rate:** node 43's `Rotate` event has 3.142 and 1.047 among its floats. 1.047 rad/s is 60°/s, which matches the
   measured rate, but the field's meaning isn't confirmed, nor whether it turns the wagon or the animal. The same event record is shared with node 75. The drive nodes 13
   and 23 have 6.283 and 0 in those places.

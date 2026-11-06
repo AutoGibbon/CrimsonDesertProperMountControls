@@ -23,7 +23,9 @@ build 1.0.0.3479. Stage tests and results are in `../horsesteer-tests/`, with lo
 ## Limits
 
 - The cause of state drops is unknown. Three logged at about 1 m/s came at a grade of about +0.5, but the horse also held `A73F` on stretches up to +0.72, and speed is well above the 0.1 of `TC9(0.1,2)`, so that condition's meaning above is in doubt. Stage 9's state drops within about 0.2 s of releasing A or D, in 8 of 9 cases, didn't reproduce in stages 9b to 9d.
-- Against a wall or stuck on an object, `UpdateBackwardRecovery` pulses once a second for as long as S is held. The tester didn't notice this at a wall. During one stuck stretch on a slope, the horse moved forward at up to 0.71 m/s for about 0.9 s in states `BE4D` and `BFCE`, and whether the pulses caused it is unknown.
+- Against a wall or stuck on an object, `UpdateBackwardRecovery` pulsed once a second for as long as S was held. From
+  [stage 18](../horsesteer-tests/stage-18.md) it only pulses above 0.3 m/s, which left out 26 of the 46 pulses in the
+  saved logs. The tester didn't notice the pulses at a wall. During one stuck stretch on a slope, the horse moved forward at up to 0.71 m/s for about 0.9 s in states `BE4D` and `BFCE`, and whether the pulses caused it is unknown.
 - `kStateWalk`, `kStateWalkSteer` and `kStateWalkStart` are the low 16 bits of a pointer, not a confirmed identity. If they stop matching, recovery doesn't fire.
 - At a wall, the horse backs in until the rider's collider stops it, so its rear goes into the wall.
 - From a walk, trot or gallop, the walk starts after about 1.7, 3.4 or 4.2 s, because the horse stops first. The start can jitter slightly.

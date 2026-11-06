@@ -120,8 +120,8 @@ constexpr float kBackwardMaxStartSpeed = 0.2f;
 constexpr float kBackwardSteer = 0.56f;
 constexpr float kBackwardSteerMin = 0.1f;
 constexpr float kBackwardSteerMax = 0.8f;
-// UpdateBackwardRecovery pulses when a mount above this speed in m/s has had no chart value for this long, repeating at
-// this gap. The speed check leaves out a mount held still by a wall.
+// UpdateBackwardRecovery only pulses for a mount above this speed in m/s, which leaves out one held still by a wall. A
+// mount with no chart value pulses once it has had none for this long, repeating at this gap.
 constexpr float kBackwardLostMinSpeed = 0.3f;
 constexpr ULONGLONG kBackwardLostDelayMs = 200;
 constexpr ULONGLONG kBackwardLostGapMs = 500;
@@ -622,7 +622,10 @@ void UpdateBackwardRecovery(const Ride& ride, bool steering) {
         inWalk = true;
         return;
     }
-    if (!inWalk || id == kStateWalkStart || steering || now < nextAllowed) return;
+    if (!inWalk || id == kStateWalkStart || steering || now < nextAllowed ||
+        g_mountSpeed.load() <= kBackwardLostMinSpeed) {
+        return;
+    }
     nextAllowed = now + kBackwardRecoveryGapMs;
     g_backwardPulseEnd = now + kBackwardPulseMs;
     Log("backward recovery pulse from state %04X at speed %.2f", id, g_mountSpeed.load());

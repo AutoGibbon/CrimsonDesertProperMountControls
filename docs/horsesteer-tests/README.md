@@ -52,4 +52,7 @@ From stage 12, the scan files and `mount identity` lines are gone. `HorseSteer.l
 | [stage-13](stage-13.md) | Controls and backward walk with the test keys removed | Passed on the horse and iguana |
 | [stage-14](stage-14.md) | Controls and backward walk on wagons | Passed. Reverse steering was poor, as with the game's brake key |
 | [stage-15](stage-15.md) | S as the wagon's brake reverse, reverse steering ramp | Brake reverse passed. The ramp delayed the horse's reverse steering by about 0.44 s, so it was removed |
+| [stage-16](stage-16.md) | Finding the animal pulling the wagon and logging its angle, and the horse's reverse steering without the ramp | Animal found, but its physics reads as the wagon's, so no angle. Short taps in reverse turn the wagon 9 to 18° and then reverse straight. Horse steers at once |
+| [stage-17](stage-17.md) | Rotations around the wagon and its animal, for the animal's angle to the wagon | No rotation in the scanned memory showed an angle between the animal and the wagon. Every one that moved followed the root heading |
+| [stage-18](stage-18.md) | Horse's state recovery pulse limited to above 0.3 m/s | Passed. Contact jitter against objects can still pass the limit, unnoticed in play |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |
