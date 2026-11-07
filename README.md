@@ -1,10 +1,10 @@
 # Proper Horse Controls
 
-## HORSIE GO WHERE HORSIE LOOK*.
+## HORSIE GO WHERE HORSIE LOOK\*.
 
 RDR2 style "horse relative" mount controls for Crimson Desert.
 
-<sub>* and Wagon, Ibex, Camel, Snow Deer, Boar, Bear, Wolf, Tiger, Lion, Iguana, Raptor, Kuku Bird (steering works while
+<sub>\* and Wagon, Ibex, Camel, Snow Deer, Boar, Bear, Wolf, Tiger, Lion, Iguana, Raptor, Kuku Bird (steering works while
 gliding too), elephant</sub>
 
 I do not like horse being tied to the camera. I wanna look around while riding.
@@ -36,8 +36,8 @@ feedback wanted.</sub>
 <details>
 <summary>All settings</summary>
 
-*This is all documented inside the **.ini**, but I know some folks want to know everything possible about a mod before
-they choose to try it out. Restart game after editing your **.ini** file.*
+_This is all documented inside the **.ini**, but I know some folks want to know everything possible about a mod before
+they choose to try it out. Restart game after editing your **.ini** file._
 
 **`[Keys] Toggle`**
 Key to turn the mod on/off. Default F5. F1-F24, A-Z, 0-9, Numpad0-Numpad9, Insert, Delete, Home, End, PageUp, PageDown,
@@ -73,6 +73,7 @@ every game start, so save them before relaunching.
 ## Compatibility
 
 - Any mod that changes mount or riding inputs will probably conflict.
+- [Crimson Route](url=https://www.nexusmods.com/crimsondesert/mods/3175) - toggle this mod off when using auto run. Their automatic game inputs need the default camera coupled controls to work properly.
 
 ## AI Disclosure
 
