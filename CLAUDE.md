@@ -42,7 +42,7 @@ DMM doesn't copy `ProperHorseControls.ini` from `DMM\mods`, so put settings chan
 `bin64\dmm\manifest.tsv` before suspecting the mod (see `docs/findings/stability.md`).
 
 For a release, run `python tools/pack.py`. It builds, then writes `build/ProperHorseControls-<version>.zip` with
-`ProperHorseControls/` holding the asi and the ini, with `Logging=0` in the zipped ini whatever the source has.
+`ProperHorseControls/` holding the asi, the ini, `LICENSE` and `THIRD_PARTY_NOTICES.txt`, with `Logging=0` in the zipped ini whatever the source has.
 
 ## Working notes
 

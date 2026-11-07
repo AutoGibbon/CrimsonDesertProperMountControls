@@ -1,7 +1,7 @@
 """Build Proper Horse Controls and pack it for release.
 
-Writes build/ProperHorseControls-<version>.zip containing ProperHorseControls/ProperHorseControls.asi and
-ProperHorseControls/ProperHorseControls.ini, with Logging=0 in the packed ini whatever src/ has.
+Writes build/ProperHorseControls-<version>.zip containing ProperHorseControls/ with ProperHorseControls.asi,
+ProperHorseControls.ini, LICENSE and THIRD_PARTY_NOTICES.txt, with Logging=0 in the packed ini whatever src/ has.
 The version is kVersion in src/HorseSteer/HorseSteer.cpp.
 
 Usage: python tools/pack.py
@@ -54,6 +54,8 @@ def main() -> None:
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.write(asi, f"{NAME}/{NAME}.asi")
         zf.writestr(f"{NAME}/{NAME}.ini", release_ini())
+        zf.write(ROOT / "LICENSE", f"{NAME}/LICENSE")
+        zf.write(ROOT / "THIRD_PARTY_NOTICES.txt", f"{NAME}/THIRD_PARTY_NOTICES.txt")
 
     print(f"\nCreated {out}")
     with zipfile.ZipFile(out) as zf:
