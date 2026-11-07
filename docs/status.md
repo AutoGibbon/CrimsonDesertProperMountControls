@@ -5,31 +5,42 @@ Where the mod stands and what to do next. Requirements are in [discovery.md](dis
 
 ## Status
 
-`src/HorseSteer` (v0.0.1) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
+`src/HorseSteer` (v1.0.0, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
 and S alone walks the mount backward, on the horse and the 12 other mounts reached, with no setup. On the wagon, S
 reverses it through the game's brake key, and A or D steer as in the game. The mod pauses during the taming minigame.
 
 It finds its addresses at startup, and every lookup matched on the two game updates since build 26423880, up to PE timestamp
-`0x6AED2E85` (2026-11-06). Exe copies for build 26423880 (`0x6AEA07A6`) and 3479 are in `scratch/exe-baseline/`.
+`0x6AED2E85` (2026-11-06). A copy of that exe is in `scratch/exe-baseline/`,
+and it's the only build in `KNOWN` in `tools/check_lookups.py`.
 
 ## Resume here
 
-Work is on `main` and committed. The build in `DMM\mods` matches the source. DMM doesn't copy `HorseSteer.ini` to
-`bin64`, so check settings in `bin64\HorseSteer.ini`, which currently has `Logging=1`.
+Work is on `main` and committed. v1.0.0 is the first Nexus release, as Proper Horse Controls: the zip from `tools/pack.py`,
+with the page text in `mod_page/description.bbcode`. `DMM\mods\ProperHorseControls.asi` matches the source. The old
+`HorseSteer.*` files are still in `DMM\mods` and `bin64`, so `HorseSteer` must stay off in DMM to avoid loading two
+copies.
 
-**Next session: publishing.** The mod is feature complete for a first release. Start with the open items in "Before
-release", then the release itself. Still to decide with the user: where it's published (Nexus, GitHub or both) and what
-goes out (a player-facing readme, a zip of `HorseSteer.asi` and `HorseSteer.ini`, or both). The player-facing readme should cover the controls (F5 toggle, Shift+F5 flip), the `.ini`
-settings, the mounts supported and the known limitations below.
+DMM copies the zip's ini to `bin64` only when there's none, and keeps an existing one on update. The mod writes any
+missing setting at startup, so a release that adds settings needs no player steps. Check settings in
+`bin64\ProperHorseControls.ini`.
 
-## Before release
+**Next session:** player reports, and the next game update. After an update, run `tools/check_lookups.py` on the new exe.
+
+## Release work
+
+All done for v1.0.0.
 
 1. **Recovery speed limit:** done, passed [stage 18](horsesteer-tests/stage-18.md).
-2. **`Logging=0`:** `src/HorseSteer/HorseSteer.ini` has `Logging=1`, so set it to 0 for release. Then check that the
-   controls work and that launching leaves no `HorseSteer.log` or `HorseSteer.csv` in
-   `bin64`.
-3. **Exe baseline:** copy the current exe (`0x6AED2E85`) to `scratch/exe-baseline/` and add it to `KNOWN` in
-   `tools/check_lookups.py`. The `0x6AEB7D59` exe can no longer be copied.
+2. **`Logging=0`:** done. `tools/pack.py` sets `Logging=0` in the zipped ini, so
+   `src/HorseSteer/ProperHorseControls.ini` keeps `Logging=1` for tests.
+3. **Exe baseline:** done. `scratch/exe-baseline/` holds only the current exe (`0x6AED2E85`), and `KNOWN` only its
+   addresses. The 3479 and 26423880 copies were discarded.
+4. **Shift+F5, toggle key and reverse steering invert:** done, passed [stage 19](horsesteer-tests/stage-19.md) on the
+   horse and wagon. Shift+F5 and `g_flip` are gone, `Toggle` under `[Keys]` sets the toggle key, and `InvertSteer`
+   under `[Reverse]` swaps A and D during the backward walk and the wagon's brake reverse, with 1 as the default.
+   `SteerInput` is fixed at 0.56 in the code, and the toggle no longer beeps.
+5. **Missing ini settings:** done, passed [stage 20](horsesteer-tests/stage-20.md). `LoadSettings` writes any missing
+   setting with its default.
 
 ## Known limitations
 

@@ -4,8 +4,7 @@
 // a pivot. S also walks the mount backward from a near stop, or on mounts with a built-in reverse, acts as the game's
 // brake key. All of this stops while the taming minigame runs, because it needs the game's own input directions.
 //
-// F5        toggle the mod
-// Shift+F5  flip the forward direction
+// F5, or the key set by Toggle under [Keys] in ProperHorseControls.ini, toggles the mod.
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -19,6 +18,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
+#include <cwctype>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -27,7 +27,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "0.0.1";
+constexpr const char* kVersion = "1.0.0";
 
 // A code signature with ?? for bytes that vary, and the target's distance from its first byte, which must be literal.
 // tools/check_lookups.py runs the same lookups on saved exes, so change both together.
@@ -79,8 +79,8 @@ constexpr uint32_t kInput_MoveAngleRelative = 0x8C;
 constexpr uint32_t kInput_CameraForward = 0x154;
 constexpr uint32_t kInput_CameraRight = 0x160;
 
-// A land mount's package, its backward walk speed in m/s, which LoadSettings can replace from HorseSteer.ini, and whether
-// S reverses it with the game's brake key instead of the backward walk.
+// A land mount's package, its backward walk speed in m/s, which LoadSettings can replace from ProperHorseControls.ini,
+// and whether S reverses it with the game's brake key instead of the backward walk.
 struct GroundMount {
     const char* package;
     float backwardSpeed;
@@ -118,8 +118,6 @@ constexpr int kBackwardPulseMs = 150;
 constexpr float kBackwardMaxStartSpeed = 0.2f;
 // A full steering input leaves the walking blend for a forward walk. This size stays in the blend and curves the path.
 constexpr float kBackwardSteer = 0.56f;
-constexpr float kBackwardSteerMin = 0.1f;
-constexpr float kBackwardSteerMax = 0.8f;
 // UpdateBackwardRecovery only pulses for a mount above this speed in m/s, which leaves out one held still by a wall. A
 // mount with no chart value pulses once it has had none for this long, repeating at this gap.
 constexpr float kBackwardLostMinSpeed = 0.3f;
@@ -171,7 +169,8 @@ uintptr_t g_stickSite = 0;
 uintptr_t g_keyCheck = 0;
 uintptr_t g_conditionTableCall = 0;
 std::atomic<bool> g_enabled{true};
-std::atomic<bool> g_flip{false};
+// The virtual-key code that toggles the mod, set by LoadSettings before ModThread's key loop starts.
+int g_toggleKey = VK_F5;
 InputSample g_samples[2];
 SafetyHookMid g_hook;
 SafetyHookMid g_stickHook;
@@ -181,7 +180,8 @@ std::atomic<int> g_steerSide{0};
 std::atomic<ULONGLONG> g_steerStart{0};
 volatile uint64_t* g_rodeoCalls = nullptr;
 std::atomic<float> g_backwardRate{kBackwardRatePerSpeed};
-std::atomic<float> g_backwardSteer{kBackwardSteer};
+// Whether A and D curve the backward walk and the brake reverse the opposite way.
+std::atomic<bool> g_backwardSteerInvert{true};
 std::atomic<ULONGLONG> g_backwardPulseEnd{0};
 std::atomic<bool> g_backwardWanted{false};
 std::atomic<bool> g_backwardWalking{false};
@@ -210,7 +210,7 @@ void OpenLog() {
     if (g_log) return;
     g_log = _wfsopen(g_logPath.c_str(), L"w", _SH_DENYNO);
     if (!g_log) return;
-    fprintf(g_log, "HorseSteer %s, base %p, PE timestamp 0x%08X\n", kVersion, reinterpret_cast<void*>(g_base),
+    fprintf(g_log, "ProperHorseControls %s, base %p, PE timestamp 0x%08X\n", kVersion, reinterpret_cast<void*>(g_base),
             GameHeaders()->FileHeader.TimeDateStamp);
     fflush(g_log);
 }
@@ -420,24 +420,98 @@ std::string ReadAppearance(uintptr_t mount) {
     return second ? ReadText(second + 0x18) : std::string();
 }
 
-// Replace the backward speeds and reverse steering settings with any values in the ini at path, and log what's in use.
+// Key names accepted by Toggle under [Keys], besides F1 to F24, A to Z, 0 to 9 and Numpad0 to Numpad9.
+constexpr struct {
+    const wchar_t* name;
+    int vk;
+} kNamedKeys[] = {
+    {L"Insert", VK_INSERT}, {L"Delete", VK_DELETE}, {L"Home", VK_HOME},           {L"End", VK_END},
+    {L"PageUp", VK_PRIOR},  {L"PageDown", VK_NEXT}, {L"Pause", VK_PAUSE},         {L"ScrollLock", VK_SCROLL},
+};
+
+// Return the virtual-key code for a key name in any case, or 0 if it isn't an accepted name. W, A, S and D return 0,
+// because they ride the mount.
+int ParseKeyName(const std::wstring& name) {
+    const auto digits = [](const wchar_t* p) {
+        if (!*p) return false;
+        for (; *p; ++p) {
+            if (!iswdigit(*p)) return false;
+        }
+        return true;
+    };
+    if (name.size() == 1) {
+        const wchar_t c = towupper(name[0]);
+        if (c == L'W' || c == L'A' || c == L'S' || c == L'D') return 0;
+        return (c >= L'A' && c <= L'Z') || (c >= L'0' && c <= L'9') ? c : 0;
+    }
+    if (towupper(name[0]) == L'F' && name.size() <= 3 && digits(name.c_str() + 1)) {
+        const int n = _wtoi(name.c_str() + 1);
+        return n >= 1 && n <= 24 ? VK_F1 + n - 1 : 0;
+    }
+    if (name.size() == 7 && _wcsnicmp(name.c_str(), L"Numpad", 6) == 0 && digits(name.c_str() + 6)) {
+        return VK_NUMPAD0 + (name[6] - L'0');
+    }
+    for (const auto& key : kNamedKeys) {
+        if (_wcsicmp(name.c_str(), key.name) == 0) return key.vk;
+    }
+    return 0;
+}
+
+// Replace the backward speeds, reverse steering invert and toggle key with any values in the ini at path, write each
+// setting it lacks with its default, so that an ini from an earlier version gains new settings, and log what's in use.
 void LoadSettings(const std::wstring& path) {
     wchar_t text[32];
+    const auto readText = [&](const wchar_t* section, const wchar_t* key) {
+        return GetPrivateProfileStringW(section, key, L"", text, 32, path.c_str()) != 0;
+    };
     const auto read = [&](const wchar_t* section, const wchar_t* key, float& value, float low, float high) {
-        if (GetPrivateProfileStringW(section, key, L"", text, 32, path.c_str()) == 0) return false;
+        if (!readText(section, key)) return false;
         value = std::clamp(wcstof(text, nullptr), low, high);
         return true;
+    };
+    int added = 0;
+    bool writeFailed = false;
+    const auto addMissing = [&](const wchar_t* section, const wchar_t* key, const wchar_t* value) {
+        if (WritePrivateProfileStringW(section, key, value, path.c_str())) {
+            ++added;
+        } else if (!writeFailed) {
+            writeFailed = true;
+            LogProblem("ini: couldn't add %ls=%ls under [%ls], error %lu", key, value, section, GetLastError());
+        }
     };
     int found = 0;
     for (GroundMount& mount : g_groundMounts) {
         const std::string name(mount.package);
         const std::wstring key(name.begin(), name.end());
-        if (read(L"BackwardSpeed", key.c_str(), mount.backwardSpeed, kBackwardSpeedMin, kBackwardSpeedMax)) ++found;
+        if (read(L"BackwardSpeed", key.c_str(), mount.backwardSpeed, kBackwardSpeedMin, kBackwardSpeedMax)) {
+            ++found;
+        } else {
+            wchar_t value[16];
+            swprintf(value, 16, L"%.1f", mount.backwardSpeed);
+            addMissing(L"BackwardSpeed", key.c_str(), value);
+        }
     }
-    float steer = kBackwardSteer;
-    if (read(L"Reverse", L"SteerInput", steer, kBackwardSteerMin, kBackwardSteerMax)) ++found;
-    g_backwardSteer = steer;
-    Log("ini: %d values read, reverse steer input %.2f", found, steer);
+    if (readText(L"Reverse", L"InvertSteer")) {
+        g_backwardSteerInvert = wcstol(text, nullptr, 10) != 0;
+        ++found;
+    } else {
+        addMissing(L"Reverse", L"InvertSteer", g_backwardSteerInvert.load() ? L"1" : L"0");
+    }
+    std::wstring keyName = L"F5";
+    if (readText(L"Keys", L"Toggle")) {
+        ++found;
+        if (const int vk = ParseKeyName(text)) {
+            g_toggleKey = vk;
+            keyName = text;
+        } else {
+            LogProblem("ini: Toggle=%ls isn't an accepted key, so F5 toggles the mod", text);
+        }
+    } else {
+        addMissing(L"Keys", L"Toggle", L"F5");
+    }
+    if (!readText(L"Debug", L"Logging")) addMissing(L"Debug", L"Logging", L"0");
+    Log("ini: %d values read, %d added, invert %d, toggle key %ls", found, added, g_backwardSteerInvert.load() ? 1 : 0,
+        keyName.c_str());
 }
 
 // Return whether the taming minigame's UI was updated within kRodeoTimeoutMs.
@@ -502,7 +576,7 @@ bool ApplyMountDirection(uintptr_t input, const Ride& ride, InputSample& sample)
     sample.cameraYaw = YawDeg(forward.x, forward.z);
 
     // The game's move angle orients the actor's +Z against the resolved direction, so forward is minus the Z axis.
-    const float sign = g_flip.load() ? 1.0f : -1.0f;
+    const float sign = -1.0f;
     const float len = std::hypot(ride.axisZ.x, ride.axisZ.z);
     if (len < 0.001f) return false;
     const float tx = sign * ride.axisZ.x / len, tz = sign * ride.axisZ.z / len;
@@ -638,8 +712,9 @@ void UpdateBraking(bool braking) {
 
 // Adjust the raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
 // and widen forward steering. S alone starts the backward walk, and A or D during it steers. On g_brakeMount, S brakes
-// instead, which the chart takes as reverse, and A or D pass through unchanged as they do with the brake key. Forward
-// steering ramps in only for digital input, as an analog stick already moves gradually.
+// instead, which the chart takes as reverse, and A or D pass through as they do with the brake key. In both reverses,
+// g_backwardSteerInvert swaps A and D. Forward steering ramps in only for digital input, as an analog stick already moves
+// gradually.
 void OnStickRead(SafetyHookContext& ctx) {
     const Ride ride = ResolveRide();
     if (!RidingGroundMount(ride)) {
@@ -661,6 +736,7 @@ void OnStickRead(SafetyHookContext& ctx) {
     UpdateBraking(brakeMount && backward);
     if (brakeMount && backward) {
         UpdateBackwardPulse(false);
+        if (g_backwardSteerInvert.load()) stick[0] = -stick[0];
         stick[1] = 0.0f;
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
         return;
@@ -672,7 +748,8 @@ void OnStickRead(SafetyHookContext& ctx) {
         if (reverseSteering) {
             // Scale by the stick's sideways push relative to its backward push, which is 1 for keys and diagonals.
             const float share = std::fabs(stick[0]) / std::max(std::fabs(stick[0]), std::fabs(stick[1]));
-            stick[0] = std::copysign(g_backwardSteer.load() * share, stick[0]);
+            stick[0] = std::copysign(kBackwardSteer * share, stick[0]);
+            if (g_backwardSteerInvert.load()) stick[0] = -stick[0];
         }
         stick[1] = pulse ? 1.0f : 0.0f;
     } else if (stick[1] < 0.0f) {
@@ -840,9 +917,9 @@ void WriteTelemetry(const Ride& ride, const std::string& package) {
         lastTick = now;
     }
 
-    fprintf(g_csv, "%llu,%d,%d,%d,%d,%d,%d,%d,%08X,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", now, KeyDown('W') ? 1 : 0,
+    fprintf(g_csv, "%llu,%d,%d,%d,%d,%d,%d,%08X,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", now, KeyDown('W') ? 1 : 0,
             KeyDown('A') ? 1 : 0, KeyDown('S') ? 1 : 0, KeyDown('D') ? 1 : 0, g_enabled.load() ? 1 : 0,
-            g_flip.load() ? 1 : 0, ride.mounted ? 1 : 0, ride.mountKey, ride.forwardFromMount ? 1 : 0,
+            ride.mounted ? 1 : 0, ride.mountKey, ride.forwardFromMount ? 1 : 0,
             haveRider ? YawDeg(riderAxis.x, riderAxis.z) : kMissing, haveMount ? YawDeg(mountAxis.x, mountAxis.z) : kMissing,
             ride.rider ? ReadSyncYaw(ride.rider) : kMissing, ride.mount ? ReadSyncYaw(ride.mount) : kMissing, speed,
             travelYaw);
@@ -1110,9 +1187,9 @@ bool InstallHook() {
 DWORD WINAPI ModThread(void* param) {
     const std::wstring dir = ModuleDir(static_cast<HMODULE>(param));
     g_base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
-    const std::wstring settings = dir + L"\\HorseSteer.ini";
-    const std::wstring csvPath = dir + L"\\HorseSteer.csv";
-    g_logPath = dir + L"\\HorseSteer.log";
+    const std::wstring settings = dir + L"\\ProperHorseControls.ini";
+    const std::wstring csvPath = dir + L"\\ProperHorseControls.csv";
+    g_logPath = dir + L"\\ProperHorseControls.log";
     g_logging = GetPrivateProfileIntW(L"Debug", L"Logging", 0, settings.c_str()) != 0;
     if (g_logging) {
         OpenLog();
@@ -1123,7 +1200,7 @@ DWORD WINAPI ModThread(void* param) {
         DeleteFileW(csvPath.c_str());
     }
     if (g_csv) {
-        fputs("tick_ms,w,a,s,d,enabled,flip,mounted,mount_key,forward_from_mount,rider_phys_yaw,mount_phys_yaw,"
+        fputs("tick_ms,w,a,s,d,enabled,mounted,mount_key,forward_from_mount,rider_phys_yaw,mount_phys_yaw,"
               "rider_sync_yaw,mount_sync_yaw,speed,travel_yaw,"
               "i0_applied,i0_stick_x,i0_stick_y,i0_angle,i0_relative,i0_camera_yaw,i0_target_yaw,"
               "i1_applied,i1_stick_x,i1_stick_y,i1_angle,i1_relative,i1_camera_yaw,i1_target_yaw,"
@@ -1137,7 +1214,7 @@ DWORD WINAPI ModThread(void* param) {
     Sleep(20000);
     if (!InstallHook()) return 0;
 
-    bool f5Was = false, wasMounted = false, wasFromMount = false, wasRodeo = false;
+    bool toggleWas = false, wasMounted = false, wasFromMount = false, wasRodeo = false;
     uintptr_t seen[2] = {};
     uintptr_t currentMount = 0;
     bool classified = false, reportedUnknown = false;
@@ -1145,19 +1222,12 @@ DWORD WINAPI ModThread(void* param) {
     std::string package;
     for (;;) {
         Sleep(10);
-        const bool f5 = GameFocused() && KeyDown(VK_F5);
-        if (f5 && !f5Was) {
-            if (KeyDown(VK_SHIFT)) {
-                g_flip = !g_flip.load();
-                Log("flip %s", g_flip.load() ? "on" : "off");
-                Beep(600, 120);
-            } else {
-                g_enabled = !g_enabled.load();
-                Log("mod %s", g_enabled.load() ? "enabled" : "disabled");
-                Beep(g_enabled.load() ? 1200 : 400, 120);
-            }
+        const bool toggle = GameFocused() && KeyDown(g_toggleKey);
+        if (toggle && !toggleWas) {
+            g_enabled = !g_enabled.load();
+            Log("mod %s", g_enabled.load() ? "enabled" : "disabled");
         }
-        f5Was = f5;
+        toggleWas = toggle;
         if (g_logging) LogStateChange();
 
         const ULONGLONG now = GetTickCount64();

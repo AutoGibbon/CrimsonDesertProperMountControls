@@ -4,7 +4,7 @@ Give each new test its own file, `stage-N.md`, with its steps and results, and a
 
 ## Logs
 
-Tracing is off by default. Before a test, set `Logging=1` under `[Debug]` in `bin64\HorseSteer.ini`, or the test leaves no logs. DMM doesn't copy the ini from `DMM\mods`, so editing that copy has no effect. With `Logging=0`, `HorseSteer.log` only exists if the mod had a problem at startup, such as a failed lookup, and launching deletes the log and CSV from any earlier run.
+Tracing is off by default. Before a test, set `Logging=1` under `[Debug]` in `bin64\ProperHorseControls.ini`, or the test leaves no logs. DMM doesn't copy the ini from `DMM\mods`, so editing that copy has no effect. With `Logging=0`, `ProperHorseControls.log` only exists if the mod had a problem at startup, such as a failed lookup, and launching deletes the log and CSV from any earlier run. Up to stage 18 the files were named `HorseSteer.*`, which the notes below and the stage files still use.
 
 `bin64\HorseSteer.log` records each address lookup, the hook install, mount changes and which actor each input slot belongs to. `bin64\HorseSteer.csv` is written about 10 times a
 second while mounted. Slot `i0` is the rider's input component and `i1` is the horse's. With W held and the mod working, `mount_phys_yaw` and `travel_yaw` stay
@@ -15,6 +15,8 @@ From stage 11, the CSV ends with `mount_package`, `marker` and `backward_rate`. 
 From stage 11b, `bin64\HorseSteer_scan_<key>a.txt` and `...b.txt` hold each mount's scan, 5 and 30 seconds after mounting. Each line is a text or RTTI class name and the chain that reached it, such as `mount->+68->+40 inline+18`, with up to 3 chains per name. `HorseSteer.log` records `controls forced on` when End is pressed, and a `mount scan` line for each scan. A forced mount's `mount_package` still shows what `ReadPackageName` read.
 
 From stage 12, the scan files and `mount identity` lines are gone. `HorseSteer.log` adds an `ini` line with the number of values read, a `mount appearance` line per mount, and a `backward release pulse` line at each release. From stage 12b, `backward lost pulse` lines replace the release pulse lines, each with the state it started from. From stage 13, the CSV's `marker` column and the log's `marker`, `backward rate` and `controls forced on` lines are gone.
+
+From stage 19, the CSV's `flip` column and the log's `flip` lines are gone, and the `ini` line ends with the reverse steering `invert` and the `toggle key`. From stage 20, the `ini` line adds the number of missing settings written to the ini.
 
 ## Tests
 
@@ -55,4 +57,6 @@ From stage 12, the scan files and `mount identity` lines are gone. `HorseSteer.l
 | [stage-16](stage-16.md) | Finding the animal pulling the wagon and logging its angle, and the horse's reverse steering without the ramp | Animal found, but its physics reads as the wagon's, so no angle. Short taps in reverse turn the wagon 9 to 18° and then reverse straight. Horse steers at once |
 | [stage-17](stage-17.md) | Rotations around the wagon and its animal, for the animal's angle to the wagon | No rotation in the scanned memory showed an angle between the animal and the wagon. Every one that moved followed the root heading |
 | [stage-18](stage-18.md) | Horse's state recovery pulse limited to above 0.3 m/s | Passed. Contact jitter against objects can still pass the limit, unnoticed in play |
+| [stage-19](stage-19.md) | Shift+F5 removed, `Toggle` key setting, `InvertSteer` on the horse, another mount and the wagon | Passed on the horse and wagon. The tester prefers `InvertSteer=1` |
+| [stage-20](stage-20.md) | Missing ini settings added with defaults at startup | Passed, run with no ini: the mod wrote every setting |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

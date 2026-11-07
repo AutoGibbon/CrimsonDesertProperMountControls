@@ -44,27 +44,16 @@ WORLD_REFERENCE = re.compile(rb"\x48\x8B\x05(....)\x48\x8B\x48\x30", re.DOTALL)
 WORLD_MIN_RATIO = 3
 
 KNOWN = {
-    0x6AE6E3E8: {  # 1.0.0.3479
-        "vtActorManager": 0x593ECF0,
-        "vtVehicleComponent": 0x593E9D8,
-        "vtRodeoUi": 0x5A6CBF8,
-        "rodeoUiSlot0": 0x11EF6B0,
-        "worldSystemSlot": 0x71B6C50,
-        "hookSite": 0xB6C4A6,
-        "stickSite": 0xB6C5A6,
-        "keyCheck": 0x3B0150,
-        "conditionTableCall": 0x3AA19C,
-    },
-    0x6AEA07A6: {  # Steam build 26423880
-        "vtActorManager": 0x5944B38,
-        "vtVehicleComponent": 0x5944B90,
-        "vtRodeoUi": 0x5A75218,
-        "rodeoUiSlot0": 0x11F09D0,
-        "worldSystemSlot": 0x71BDEF0,
-        "hookSite": 0xB6D526,
-        "stickSite": 0xB6D626,
-        "keyCheck": 0x3B0750,
-        "conditionTableCall": 0x3AA79C,
+    0x6AED2E85: {  # Steam build of 2026-11-06, passed stage 18
+        "vtActorManager": 0x5946C40,
+        "vtVehicleComponent": 0x5946C98,
+        "vtRodeoUi": 0x5A747E8,
+        "rodeoUiSlot0": 0x11F1180,
+        "worldSystemSlot": 0x71C0100,
+        "hookSite": 0xB6D946,
+        "stickSite": 0xB6DA46,
+        "keyCheck": 0x3B0A30,
+        "conditionTableCall": 0x3AAA7C,
     },
 }
 
