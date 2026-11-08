@@ -25,7 +25,7 @@ Close the game and copy the log, CSV and ini to `scratch/probe-runs/stage29/`.
 
 | Step | Result |
 | --- | --- |
-| 1. Lowest gait | |
+| 1. Lowest gait | GOOD |
 
 - Any crash or freeze?
 - Notes:
