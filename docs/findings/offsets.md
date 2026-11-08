@@ -56,6 +56,10 @@ A published ASI that makes a brake tap drop one gait. It was analysed statically
 `scratch/mods/HorseTapBrake-1.0.2/`. `tools/apply_htb.py ASI EXE` repeats its lookups on an exe and prints its key query signature, and `tools/asi_dis.py` disassembles an ASI. Its key query and
 key hash are in [charts-and-braking.md](charts-and-braking.md).
 
+Its author gave written permission on 2026-11-08 to use its core feature in this mod, and offered its source and `CLAUDE.md`. Any release that uses the idea needs credit for it, and the mod page's line that no features were replicated has to change.
+
+How a tap works, from the disassembly: on a press of `Key_Brake`, the slot 8 hook answers the key as held until the second change into a `mount_value` 0 state, for at most `TapMaxMs` (1500), or for `TapConfirmMs` (300) if no such state appears. The hook has no actor or steering check. Its timings match the chart's slowing chain, but a tap at a walk needs 1.8 to 2.0 s, longer than the cap. The bear and camel charts have no `key_brake` branches, and the wolf and warthog have one each, at a walk.
+
 Checked against this build's exe:
 
 - **Vtable:** RTTI finds `NormalMovementMethod`'s vtable at `exe+0x5958C10`. Slots 4, 5 and 6 are all the empty stub `exe+0x3A3450`.

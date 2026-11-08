@@ -11,8 +11,8 @@ Replicate Red Dead Redemption 2's horse-relative controls, through a native ASI 
 
 ## Requirements
 
-- **Forward/back:** W moves the horse along its own facing. S from standing walks the horse backward, as in RDR2. S is not a brake or a drift trigger: the tester dropped both, because players press
-  S while riding to turn, which would start unwanted drifts, and it makes escaping a drift harder. Alt still brakes and drifts as in the base game.
+- **Forward/back:** W moves the horse along its own facing. S from standing walks the horse backward, as in RDR2. Tapping S with W held, pulling the stick back, or pressing the game's brake key slows the mount by a gait, on wagons too. S must not answer the game's brake key: players press
+  S while riding to turn, which would start unwanted drifts, and it makes escaping a drift harder. Alt still brakes and drifts as in the base game, since a player who wants to drift does it on purpose.
 - **Steering:** A and D change the horse's heading while held. With no other input the horse walks in a small radius,
   and releasing W while steering at speed gives a tighter turn. The user wants to keep both behaviours.
 - **Pivot:** S with A or D turns the horse nearly on the spot, at about 52°/s and 0.5 m/s, and the user wants to keep it.

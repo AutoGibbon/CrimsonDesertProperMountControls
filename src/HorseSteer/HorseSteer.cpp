@@ -2,7 +2,8 @@
 // ClientInputActorComponent's per-frame update with the mount's, so move input is resolved against the mount's facing.
 // Also widens and ramps in forward steering angles, and removes backward input, which leaves S with a steering input as
 // a pivot. S also walks the mount backward from a near stop, or on mounts with a built-in reverse, acts as the game's
-// brake key. All of this stops while the taming minigame runs, because it needs the game's own input directions.
+// brake key. Tapping S with W held slows the mount by a gait. All of this stops while the taming minigame runs, because
+// it needs the game's own input directions.
 //
 // F5, or the key set by Toggle under [Keys] in ProperHorseControls.ini, toggles the mod.
 
@@ -129,6 +130,15 @@ constexpr uint16_t kStateWalk = 0xA73F;
 constexpr uint16_t kStateWalkSteer = 0xA56E;
 // Minimum time between pulses that return the horse to the walk state, in case a pulse doesn't get it there.
 constexpr ULONGLONG kBackwardRecoveryGapMs = 1000;
+// UpdateBrakeGap only starts at or above this speed in m/s, ends after this long at the latest, and treats a sideways
+// stick above this size as steering, which leaves room for a gamepad pulled back slightly off center.
+constexpr float kBrakeGapMinSpeed = 1.0f;
+constexpr ULONGLONG kBrakeGapMaxMs = 3000;
+constexpr float kBrakeGapSteerX = 0.3f;
+// UpdateBrakeAssist's position write stops below this speed in m/s, and never opposes more than this share of the
+// current speed, so that it can't push the mount backward.
+constexpr float kBrakeAssistMinSpeed = 0.3f;
+constexpr float kBrakeAssistMaxShare = 0.5f;
 
 constexpr float kMissing = -9999.0f;
 constexpr float kRadToDeg = 57.29578f;
@@ -188,11 +198,21 @@ std::atomic<bool> g_backwardWalking{false};
 // The ground mount that S reverses with the brake key, or 0, and whether S is braking it.
 std::atomic<uintptr_t> g_brakeMount{0};
 std::atomic<bool> g_braking{false};
+// The share of the mount's speed at the tap that UpdateBrakeAssist's position write adds per second.
+std::atomic<float> g_brakeAssistPerSecond{0.4f};
+// Whether a stick gap is running, the mount's speed when it started, and the speed the position write is opposing.
+std::atomic<bool> g_brakeGap{false};
+std::atomic<float> g_brakeGapStartSpeed{0};
+std::atomic<float> g_brakeAssistSpeed{0};
+// The mount input component's raw stick before OnStickRead edits it, for logging.
+std::atomic<float> g_rawStickX{0}, g_rawStickY{0};
 
 using ConditionHandler = uint8_t (*)(uintptr_t, uintptr_t*, void*, void*, uint8_t, void*, void*);
 ConditionHandler g_keyCondition = nullptr;
 
 const IMAGE_NT_HEADERS* GameHeaders();
+bool KeyDown(int vk);
+bool GameFocused();
 
 // Write one timestamped line to g_log, if it's open.
 void WriteLogLine(const char* fmt, va_list args) {
@@ -457,8 +477,9 @@ int ParseKeyName(const std::wstring& name) {
     return 0;
 }
 
-// Replace the backward speeds, reverse steering invert and toggle key with any values in the ini at path, write each
-// setting it lacks with its default, so that an ini from an earlier version gains new settings, and log what's in use.
+// Replace the backward speeds, reverse steering invert, toggle key and slowdown assist with any values in the ini at
+// path, write each setting it lacks with its default, so that an ini from an earlier version gains new settings, and log
+// what's in use.
 void LoadSettings(const std::wstring& path) {
     wchar_t text[32];
     const auto readText = [&](const wchar_t* section, const wchar_t* key) {
@@ -510,8 +531,15 @@ void LoadSettings(const std::wstring& path) {
         addMissing(L"Keys", L"Toggle", L"F5");
     }
     if (!readText(L"Debug", L"Logging")) addMissing(L"Debug", L"Logging", L"0");
-    Log("ini: %d values read, %d added, invert %d, toggle key %ls", found, added, g_backwardSteerInvert.load() ? 1 : 0,
-        keyName.c_str());
+    float assistPerSecond = g_brakeAssistPerSecond.load();
+    if (read(L"Slowdown", L"AssistPerSecond", assistPerSecond, 0.0f, 2.0f)) {
+        g_brakeAssistPerSecond = assistPerSecond;
+        ++found;
+    } else {
+        addMissing(L"Slowdown", L"AssistPerSecond", L"0.4");
+    }
+    Log("ini: %d values read, %d added, invert %d, toggle key %ls, assist per second %.2f", found, added,
+        g_backwardSteerInvert.load() ? 1 : 0, keyName.c_str(), g_brakeAssistPerSecond.load());
 }
 
 // Return whether the taming minigame's UI was updated within kRodeoTimeoutMs.
@@ -626,6 +654,50 @@ void UpdateBackwardWalk(const Ride& ride) {
     SafeWrite(physics + 0x90, &position, sizeof position);
 }
 
+// Move the mount against its velocity during a stick gap while its chart state's value is 0, by an amount that grows at
+// g_brakeAssistPerSecond times its speed when the gap started.
+void UpdateBrakeAssist(const Ride& ride) {
+    static bool active = false;
+    static float assist = 0.0f;
+    static LARGE_INTEGER last{};
+
+    const float perSecond = g_brakeAssistPerSecond.load();
+    if (!g_brakeGap.load() || perSecond <= 0.0f) {
+        active = false;
+        assist = 0.0f;
+        g_brakeAssistSpeed = 0.0f;
+        return;
+    }
+    LARGE_INTEGER now, frequency;
+    QueryPerformanceCounter(&now);
+    QueryPerformanceFrequency(&frequency);
+    uintptr_t state = 0;
+    float value = kMissing, velX = 0.0f, velZ = 0.0f;
+    const bool slowing = ReadChartState(ride.mount, state, value) && value == 0.0f;
+    if (!active || !slowing) {
+        active = true;
+        last = now;
+        g_brakeAssistSpeed = 0.0f;
+        return;
+    }
+    const float dt = std::min(static_cast<float>(now.QuadPart - last.QuadPart) / frequency.QuadPart, 0.1f);
+    last = now;
+    const uintptr_t physics = PhysicsObject(ride.mount);
+    Vec3 position{};
+    if (!physics || !Read(physics + 0x90, position) || !Finite(position) || !ReadVelocity(ride.mount, velX, velZ)) return;
+    const float speed = std::hypot(velX, velZ);
+    if (speed < kBrakeAssistMinSpeed) {
+        g_brakeAssistSpeed = 0.0f;
+        return;
+    }
+    assist += perSecond * g_brakeGapStartSpeed.load() * dt;
+    const float applied = std::min(assist, speed * kBrakeAssistMaxShare);
+    g_brakeAssistSpeed = applied;
+    position.x -= velX / speed * applied * kBackwardRatePerSpeed * dt;
+    position.z -= velZ / speed * applied * kBackwardRatePerSpeed * dt;
+    SafeWrite(physics + 0x90, &position, sizeof position);
+}
+
 void OnInputUpdate(SafetyHookContext& ctx) {
     const uintptr_t input = ctx.rdi;
     uintptr_t actor = 0;
@@ -646,7 +718,10 @@ void OnInputUpdate(SafetyHookContext& ctx) {
     bool applied = false;
     if (RidingGroundMount(ride) && ride.haveForward) applied = ApplyMountDirection(input, ride, sample);
     sample.applied = applied;
-    if (RidingGroundMount(ride) && actor == ride.mount) UpdateBackwardWalk(ride);
+    if (RidingGroundMount(ride) && actor == ride.mount) {
+        UpdateBackwardWalk(ride);
+        UpdateBrakeAssist(ride);
+    }
 }
 
 // Return whether backward input should read as forward for now: for kBackwardPulseMs once the mount is below
@@ -710,6 +785,51 @@ void UpdateBraking(bool braking) {
     if (g_braking.exchange(braking) != braking) Log("brake reverse %s", braking ? "on" : "off");
 }
 
+// Return whether forward input should read as released, so that the chart slows the mount. This starts when S is pressed
+// with W held, or backward becomes true, while the mount is at kBrakeGapMinSpeed or above in a chart state with a value
+// above 0. It ends on the second change into a chart state whose value is 0 or missing, on steering, or after
+// kBrakeGapMaxMs.
+bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward) {
+    static bool sWas = false, backwardWas = false;
+    static uintptr_t lastState = 0;
+    static int slowingStates = 0;
+    static ULONGLONG start = 0;
+
+    const bool s = GameFocused() && KeyDown('S');
+    const bool pressed = (s && !sWas && KeyDown('W')) || (backward && !backwardWas);
+    sWas = s;
+    backwardWas = backward;
+    uintptr_t state = 0;
+    float value = kMissing;
+    const bool haveState = ReadChartState(ride.mount, state, value);
+    const ULONGLONG now = GetTickCount64();
+    const float speed = g_mountSpeed.load();
+    if (!g_brakeGap.load()) {
+        if (!pressed || steering || speed < kBrakeGapMinSpeed || !haveState || value <= 0.0f ||
+            g_backwardWalking.load()) {
+            return false;
+        }
+        g_brakeGap = true;
+        g_brakeGapStartSpeed = speed;
+        lastState = state;
+        slowingStates = 0;
+        start = now;
+        Log("brake gap start tick=%llu speed=%.2f value=%.3f state=%04X shift=%d", now, speed, value,
+            static_cast<uint16_t>(state), KeyDown(VK_SHIFT) ? 1 : 0);
+        return true;
+    }
+    if (haveState && state != lastState) {
+        lastState = state;
+        if (value == 0.0f || value == kMissing) ++slowingStates;
+    }
+    const char* reason = slowingStates >= 2 ? "next state" : steering ? "steering" : nullptr;
+    if (!reason && now - start >= kBrakeGapMaxMs) reason = "time cap";
+    if (!reason) return true;
+    g_brakeGap = false;
+    Log("brake gap end tick=%llu after=%llums speed=%.2f reason=%s", now, now - start, speed, reason);
+    return false;
+}
+
 // Adjust the raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
 // and widen forward steering. S alone starts the backward walk, and A or D during it steers. On g_brakeMount, S brakes
 // instead, which the chart takes as reverse, and A or D pass through as they do with the brake key. In both reverses,
@@ -721,12 +841,18 @@ void OnStickRead(SafetyHookContext& ctx) {
         g_backwardWanted = false;
         g_backwardWalking = false;
         UpdateBraking(false);
+        g_brakeGap = false;
         return;
     }
     float velX = 0, velZ = 0;
     if (ReadVelocity(ride.mount, velX, velZ)) g_mountSpeed = std::hypot(velX, velZ);
     float stick[2];
     if (!SafeRead(ctx.rdi + kInput_RawStick, stick, sizeof stick)) return;
+    uintptr_t inputActor = 0;
+    if (Read(ctx.rdi + kInput_Actor, inputActor) && inputActor == ride.mount) {
+        g_rawStickX = stick[0];
+        g_rawStickY = stick[1];
+    }
     const float heldMs = SteerHeldMs(stick[0]);
     const bool backward = stick[1] < kBackwardStickY;
     const bool steering = std::fabs(stick[0]) > 0.01f;
@@ -738,6 +864,12 @@ void OnStickRead(SafetyHookContext& ctx) {
         UpdateBackwardPulse(false);
         if (g_backwardSteerInvert.load()) stick[0] = -stick[0];
         stick[1] = 0.0f;
+        SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
+        return;
+    }
+    if (!brakeMount && UpdateBrakeGap(ride, std::fabs(stick[0]) > kBrakeGapSteerX, backward)) {
+        UpdateBackwardPulse(false);
+        stick[0] = stick[1] = 0.0f;
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
         return;
     }
@@ -934,7 +1066,8 @@ void WriteTelemetry(const Ride& ride, const std::string& package) {
     fprintf(g_csv, ",%llX,%.3f,%.3f,%.3f,%.3f,%.2f", static_cast<unsigned long long>(chartState), chartValue,
             haveVelocity ? velX : kMissing, haveVelocity ? velZ : kMissing,
             haveVelocity ? std::hypot(velX, velZ) : kMissing, haveRider ? riderPos.y : kMissing);
-    fprintf(g_csv, ",%s,%.2f\n", package.c_str(), g_backwardRate.load());
+    fprintf(g_csv, ",%s,%.2f,%.3f,%.3f,%d,%d,%.3f\n", package.c_str(), g_backwardRate.load(), g_rawStickX.load(),
+            g_rawStickY.load(), KeyDown(VK_SHIFT) ? 1 : 0, g_brakeGap.load() ? 1 : 0, g_brakeAssistSpeed.load());
     ++rows;
     if (now - lastFlush > 1000) {
         fflush(g_csv);
@@ -1204,7 +1337,8 @@ DWORD WINAPI ModThread(void* param) {
               "rider_sync_yaw,mount_sync_yaw,speed,travel_yaw,"
               "i0_applied,i0_stick_x,i0_stick_y,i0_angle,i0_relative,i0_camera_yaw,i0_target_yaw,"
               "i1_applied,i1_stick_x,i1_stick_y,i1_angle,i1_relative,i1_camera_yaw,i1_target_yaw,"
-              "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y,mount_package,backward_rate\n",
+              "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y,mount_package,backward_rate,"
+              "raw_stick_x,raw_stick_y,shift,brake_gap,brake_assist\n",
               g_csv);
     }
 

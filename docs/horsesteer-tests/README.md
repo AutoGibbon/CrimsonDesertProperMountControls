@@ -18,6 +18,12 @@ From stage 12, the scan files and `mount identity` lines are gone. `HorseSteer.l
 
 From stage 19, the CSV's `flip` column and the log's `flip` lines are gone, and the `ini` line ends with the reverse steering `invert` and the `toggle key`. From stage 20, the `ini` line adds the number of missing settings written to the ini.
 
+From stage 21, the CSV ends with `raw_stick_x` and `raw_stick_y`, the mount input component's stick before the mod edits it, then `shift`, `brake_gap` (1 during a stick gap), `brake_assist` (the speed in m/s the position write is opposing) and `marker` (Insert presses so far). The `ini` line adds `brake test` and `assist per second`, and the log adds `brake gap start`, `brake gap end` and `marker` lines with `tick=`. With `Logging=1`, Insert also reloads `[BrakeTest]` from the ini, unless Insert is the toggle key.
+
+From stage 22, the `ini` and `marker` lines add `release on speed`, `brake gap start` adds `target`, `brake gap end` can have the reason `speed`, and the log adds `gait value` lines.
+
+From stage 23, `[BrakeTest]`, Insert, the CSV's `marker` column and the log's `marker` and `gait value` lines are gone. The `ini` line drops `brake test` and `release on speed`, and `brake gap start` drops `target`.
+
 ## Tests
 
 | Test | Checks | Result |
@@ -59,4 +65,7 @@ From stage 19, the CSV's `flip` column and the log's `flip` lines are gone, and 
 | [stage-18](stage-18.md) | Horse's state recovery pulse limited to above 0.3 m/s | Passed. Contact jitter against objects can still pass the limit, unnoticed in play |
 | [stage-19](stage-19.md) | Shift+F5 removed, `Toggle` key setting, `InvertSteer` on the horse, another mount and the wagon | Passed on the horse and wagon. The tester prefers `InvertSteer=1` |
 | [stage-20](stage-20.md) | Missing ini settings added with defaults at startup | Passed, run with no ini: the mod wrote every setting |
+| [stage-21](stage-21.md) | W+S raw stick, gait after a stick gap, and a position write against forward motion | W+S reads 0. On the horse, a stick gap dropped one gait in 48 of 48 taps. The position write reached at most 1.1 m/s, and only ran during the gap. On the bear and camel, taps from high gaits landed two or three gaits down |
+| [stage-22](stage-22.md) | Ending a stick gap at the next lower gait's speed, on the bear and camel, with and without the position write | Bear: 12 of 12 taps landed one gait lower. Camel: 3.5 to 2.6 worked, but 9.0 landed on 3.5. The lowest gait still runs to the 3 s cap. Feet looked fine with the write |
+| [stage-23](stage-23.md) | Tap and hold of S to slow every ground mount, the `[Slowdown]` setting, and the position write on longer drops | Passed on the horse, bear and wagon. No camel ride was logged |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |
