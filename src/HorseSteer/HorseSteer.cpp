@@ -28,7 +28,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.0.0";
+constexpr const char* kVersion = "1.1.0";
 
 // A code signature with ?? for bytes that vary, and the target's distance from its first byte, which must be literal.
 // tools/check_lookups.py runs the same lookups on saved exes, so change both together.
@@ -137,10 +137,11 @@ constexpr ULONGLONG kBackwardRecoveryGapMs = 1000;
 constexpr float kBrakeGapMinSpeed = 1.0f;
 constexpr ULONGLONG kBrakeGapMaxMs = 3000;
 constexpr float kBrakeGapSteerX = 0.3f;
-// UpdateBrakeAssist's position write stops below this speed in m/s, and never opposes more than this share of the
-// current speed, so that it can't push the mount backward.
-constexpr float kBrakeAssistMinSpeed = 0.3f;
-constexpr float kBrakeAssistMaxShare = 0.5f;
+// UpdateBrakeGap ends below this speed in m/s, so that forward input works again once the mount has stopped.
+constexpr float kBrakeGapStopSpeed = 0.3f;
+// A gap on g_brakeMount that starts above this chart value can end early, below this speed in m/s.
+constexpr float kBrakeMountLowValue = 4.0f;
+constexpr float kBrakeMountEndSpeed = 5.0f;
 
 constexpr float kMissing = -9999.0f;
 constexpr float kRadToDeg = 57.29578f;
@@ -200,12 +201,8 @@ std::atomic<bool> g_backwardWalking{false};
 // The ground mount that S reverses with the brake key, or 0, and whether S is braking it.
 std::atomic<uintptr_t> g_brakeMount{0};
 std::atomic<bool> g_braking{false};
-// The share of the mount's speed at the tap that UpdateBrakeAssist's position write adds per second.
-std::atomic<float> g_brakeAssistPerSecond{0.4f};
-// Whether a stick gap is running, the mount's speed when it started, and the speed the position write is opposing.
+// Whether a stick gap is running.
 std::atomic<bool> g_brakeGap{false};
-std::atomic<float> g_brakeGapStartSpeed{0};
-std::atomic<float> g_brakeAssistSpeed{0};
 // The mount input component's raw stick before OnStickRead edits it, for logging.
 std::atomic<float> g_rawStickX{0}, g_rawStickY{0};
 
@@ -533,15 +530,8 @@ void LoadSettings(const std::wstring& path) {
         addMissing(L"Keys", L"Toggle", L"F5");
     }
     if (!readText(L"Debug", L"Logging")) addMissing(L"Debug", L"Logging", L"0");
-    float assistPerSecond = g_brakeAssistPerSecond.load();
-    if (read(L"Slowdown", L"AssistPerSecond", assistPerSecond, 0.0f, 2.0f)) {
-        g_brakeAssistPerSecond = assistPerSecond;
-        ++found;
-    } else {
-        addMissing(L"Slowdown", L"AssistPerSecond", L"0.4");
-    }
-    Log("ini: %d values read, %d added, invert %d, toggle key %ls, assist per second %.2f", found, added,
-        g_backwardSteerInvert.load() ? 1 : 0, keyName.c_str(), g_brakeAssistPerSecond.load());
+    Log("ini: %d values read, %d added, invert %d, toggle key %ls", found, added, g_backwardSteerInvert.load() ? 1 : 0,
+        keyName.c_str());
 }
 
 // Return whether the taming minigame's UI was updated within kRodeoTimeoutMs.
@@ -656,50 +646,6 @@ void UpdateBackwardWalk(const Ride& ride) {
     SafeWrite(physics + 0x90, &position, sizeof position);
 }
 
-// Move the mount against its velocity during a stick gap while its chart state's value is 0, by an amount that grows at
-// g_brakeAssistPerSecond times its speed when the gap started.
-void UpdateBrakeAssist(const Ride& ride) {
-    static bool active = false;
-    static float assist = 0.0f;
-    static LARGE_INTEGER last{};
-
-    const float perSecond = g_brakeAssistPerSecond.load();
-    if (!g_brakeGap.load() || perSecond <= 0.0f) {
-        active = false;
-        assist = 0.0f;
-        g_brakeAssistSpeed = 0.0f;
-        return;
-    }
-    LARGE_INTEGER now, frequency;
-    QueryPerformanceCounter(&now);
-    QueryPerformanceFrequency(&frequency);
-    uintptr_t state = 0;
-    float value = kMissing, velX = 0.0f, velZ = 0.0f;
-    const bool slowing = ReadChartState(ride.mount, state, value) && value == 0.0f;
-    if (!active || !slowing) {
-        active = true;
-        last = now;
-        g_brakeAssistSpeed = 0.0f;
-        return;
-    }
-    const float dt = std::min(static_cast<float>(now.QuadPart - last.QuadPart) / frequency.QuadPart, 0.1f);
-    last = now;
-    const uintptr_t physics = PhysicsObject(ride.mount);
-    Vec3 position{};
-    if (!physics || !Read(physics + 0x90, position) || !Finite(position) || !ReadVelocity(ride.mount, velX, velZ)) return;
-    const float speed = std::hypot(velX, velZ);
-    if (speed < kBrakeAssistMinSpeed) {
-        g_brakeAssistSpeed = 0.0f;
-        return;
-    }
-    assist += perSecond * g_brakeGapStartSpeed.load() * dt;
-    const float applied = std::min(assist, speed * kBrakeAssistMaxShare);
-    g_brakeAssistSpeed = applied;
-    position.x -= velX / speed * applied * kBackwardRatePerSpeed * dt;
-    position.z -= velZ / speed * applied * kBackwardRatePerSpeed * dt;
-    SafeWrite(physics + 0x90, &position, sizeof position);
-}
-
 void OnInputUpdate(SafetyHookContext& ctx) {
     const uintptr_t input = ctx.rdi;
     uintptr_t actor = 0;
@@ -722,7 +668,6 @@ void OnInputUpdate(SafetyHookContext& ctx) {
     sample.applied = applied;
     if (RidingGroundMount(ride) && actor == ride.mount) {
         UpdateBackwardWalk(ride);
-        UpdateBrakeAssist(ride);
     }
 }
 
@@ -811,13 +756,15 @@ bool BrakeKeyHeld() {
 // Return whether forward input should read as released, so that the chart slows the mount. This starts when S is pressed
 // with W held, the brake key is pressed with forward true, or backward becomes true, while the mount is at
 // kBrakeGapMinSpeed or above in a chart state with a value
-// above 0. It ends on the second consecutive change into a chart state whose value is 0 or missing, on steering,
-// or after kBrakeGapMaxMs.
+// above 0. It ends on the second consecutive change into a chart state whose value is 0 or missing, below
+// kBrakeGapStopSpeed, on steering, or after kBrakeGapMaxMs. A gap on g_brakeMount that started above kBrakeMountLowValue also ends on the first such
+// change once speed is below kBrakeMountEndSpeed, so that a tap at cruise doesn't run on to the time cap.
 bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward) {
     static bool sWas = false, backwardWas = false, brakeWas = false;
     static uintptr_t lastState = 0;
     static int slowingStates = 0;
     static ULONGLONG start = 0;
+    static float startValue = 0.0f;
 
     const bool s = GameFocused() && KeyDown('S');
     const bool brake = BrakeKeyHeld();
@@ -843,7 +790,7 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
             return false;
         }
         g_brakeGap = true;
-        g_brakeGapStartSpeed = speed;
+        startValue = value;
         lastState = state;
         slowingStates = 0;
         start = now;
@@ -856,7 +803,13 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
         lastState = state;
         slowingStates = value == 0.0f || value == kMissing ? slowingStates + 1 : 0;
     }
-    const char* reason = slowingStates >= 2 ? "next state" : steering ? "steering" : nullptr;
+    const bool brakeMountDropped = ride.mount == g_brakeMount.load() && startValue > kBrakeMountLowValue &&
+                                   slowingStates >= 1 && speed < kBrakeMountEndSpeed;
+    const char* reason = slowingStates >= 2           ? "next state"
+                         : brakeMountDropped          ? "end speed"
+                         : speed < kBrakeGapStopSpeed ? "stopped"
+                         : steering                   ? "steering"
+                                                      : nullptr;
     if (!reason && now - start >= kBrakeGapMaxMs) reason = "time cap";
     if (!reason) return true;
     g_brakeGap = false;
@@ -901,7 +854,7 @@ void OnStickRead(SafetyHookContext& ctx) {
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
         return;
     }
-    if (!brakeMount && UpdateBrakeGap(ride, std::fabs(stick[0]) > kBrakeGapSteerX, backward, stick[1] > 0.0f)) {
+    if (UpdateBrakeGap(ride, std::fabs(stick[0]) > kBrakeGapSteerX, backward, stick[1] > 0.0f)) {
         UpdateBackwardPulse(false);
         stick[0] = stick[1] = 0.0f;
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
@@ -1100,8 +1053,8 @@ void WriteTelemetry(const Ride& ride, const std::string& package) {
     fprintf(g_csv, ",%llX,%.3f,%.3f,%.3f,%.3f,%.2f", static_cast<unsigned long long>(chartState), chartValue,
             haveVelocity ? velX : kMissing, haveVelocity ? velZ : kMissing,
             haveVelocity ? std::hypot(velX, velZ) : kMissing, haveRider ? riderPos.y : kMissing);
-    fprintf(g_csv, ",%s,%.2f,%.3f,%.3f,%d,%d,%.3f\n", package.c_str(), g_backwardRate.load(), g_rawStickX.load(),
-            g_rawStickY.load(), KeyDown(VK_SHIFT) ? 1 : 0, g_brakeGap.load() ? 1 : 0, g_brakeAssistSpeed.load());
+    fprintf(g_csv, ",%s,%.2f,%.3f,%.3f,%d,%d\n", package.c_str(), g_backwardRate.load(), g_rawStickX.load(),
+            g_rawStickY.load(), KeyDown(VK_SHIFT) ? 1 : 0, g_brakeGap.load() ? 1 : 0);
     ++rows;
     if (now - lastFlush > 1000) {
         fflush(g_csv);
@@ -1372,7 +1325,7 @@ DWORD WINAPI ModThread(void* param) {
               "i0_applied,i0_stick_x,i0_stick_y,i0_angle,i0_relative,i0_camera_yaw,i0_target_yaw,"
               "i1_applied,i1_stick_x,i1_stick_y,i1_angle,i1_relative,i1_camera_yaw,i1_target_yaw,"
               "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y,mount_package,backward_rate,"
-              "raw_stick_x,raw_stick_y,shift,brake_gap,brake_assist\n",
+              "raw_stick_x,raw_stick_y,shift,brake_gap\n",
               g_csv);
     }
 

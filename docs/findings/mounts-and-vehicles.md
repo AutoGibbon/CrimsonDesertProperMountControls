@@ -103,6 +103,32 @@ Build `0x6AEB7D59`. Tested on `cd_r0004_05_wagon` in [stage 14](../horsesteer-te
 - **S as the brake key (stage 15):** S answers the wagon's `key_brake` as pressed, which reverses it as the brake key
   does, including with A or D. Passed. Other mounts keep the backward walk.
 
+## Wagon slowdown
+
+Build `0x6AED2E85`, stages [26](../horsesteer-tests/stage-26.md) to [28](../horsesteer-tests/stage-28.md). Nodes are from
+`r0012_wagon_upper`. That condition `TC9` tests speed is inferred, and matches the logged speeds. State IDs change between
+sessions.
+
+| Node | `mount_value` | State in these runs | Role |
+| --- | --- | --- | --- |
+| 44 | 5.5 | `D93D` | Drive. Up to 11.9 m/s with Shift, and decays to a 5.5 m/s cruise without it |
+| 75 | 2.8 | `C7EF` | Low drive, settling at 2.8 m/s |
+| 23 | 0 | `0200` | Slowing at 6 m/s or above, moves to node 13 below 5 m/s |
+| 13 | 0 | `0724` | Slowing below that, about 1.4 m/s² |
+| 51 | missing | `AFAA` | Idle |
+| 43 | 1.0 | `E14A` | Brake reverse |
+
+- **`key_brake`:** only idle (51) leads to reverse, and it's tested before forward input. The drive and slowing nodes
+  don't read it, so the brake key can start the slowdown on a moving wagon without reversing it.
+- **Landing:** with forward input back, nodes 23 and 13 both go to node 75, so a tap from top speed settles at 2.8 m/s and
+  skips the 5.5 m/s cruise.
+- **Taps from 5.5 m/s:** these go straight to node 13, so the second slowing state only comes at idle, and they ran to
+  the 3 s cap at about 1 m/s. On the wagon, a tap from `mount_value` above `kBrakeMountLowValue` also ends on the first
+  slowing state below `kBrakeMountEndSpeed` (5 m/s).
+- **Taps from `mount_value` 2.8:** a dip to about 0.26 m/s, and back to 2.8 m/s in about 4 s with W held.
+- **Shift held:** node 44 leaves on released input only with `NOT key_run`, so a tap at top speed with Shift held does
+  little.
+
 ## Leads
 
 - **Other movement classes (Horse Tap Brake):** the exe has `VehicleMovementMethod`, `DriverMovementMethod`, `RideOnMovementMethod`, `RideOffMovementMethod` and `MiniGameMovementMethod`.

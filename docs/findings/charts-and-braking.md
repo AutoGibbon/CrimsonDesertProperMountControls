@@ -67,6 +67,12 @@ Results from [stage 21](../horsesteer-tests/stage-21.md), on the horse:
   traced. With no lower gait to target, a tap at the lowest gait still runs to the time cap.
 - **Position write at `AssistPerSecond=0.4` on those mounts:** shortens the gaps by about a quarter, peaking at 2.0 m/s,
   and the tester saw no problem with the feet.
+- **Position write removed:** on the wagon, `mount_vel` jumped by up to 2 m/s when it ended
+  ([stage 27](../horsesteer-tests/stage-27.md)), and the tester could see it on the horse's animation more often than
+  not. Without it, the bear's 5.2 tap took the same 2.1 to 2.2 s, on `reason=next state` (`probe-runs/bear-no-assist/`).
+- **Stopped mounts:** in 10 saved runs, 25 of 279 taps ended on the time cap, 16 of them on the bear and camel's low gaits
+  under the older end rules, after 0.8 to 2.0 s below 0.3 m/s. `UpdateBrakeGap` now also ends below `kBrakeGapStopSpeed`
+  (0.3 m/s), so that W works again once the mount has stopped.
 
 Horse slowing chain, with each node's exit speed and the low hex digits of its state: `#38` `E83C` (12), `#119` `D85C`
 (9.5), `#0` `C5AF` (5.2), `#36` `B7CC` (2.8), `#186` `A73F` (near 0). A stop after releasing W from each gait, median time
@@ -89,6 +95,8 @@ elephant has no logged stops. The charts have 40 to 50 nodes, against the horse'
 | Iguana | `#7` | 2.5 |
 
 The landing gait doesn't follow from the exit speed: the bear's 4.5 lands on 5.2, and the camel's 5.0 lands on 3.5.
+
+The wagon has two slowing nodes, split by speed: see [mounts-and-vehicles.md](mounts-and-vehicles.md) (Wagon slowdown).
 
 ## Slowing a mount with the brake key
 

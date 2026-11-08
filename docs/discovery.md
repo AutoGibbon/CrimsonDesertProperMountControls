@@ -60,7 +60,8 @@ In [findings/](findings/), by topic, for build 1.0.0.3479:
 - [CrimsonDesertTelemetry](https://github.com/ZappendusterFX/CrimsonDesertTelemetry): camera layout and write-watch
   tracing in `docs/ENGINE_CAMERA_RESEARCH.md`
 - [CrimsonDesertTools](https://github.com/tkhquang/CrimsonDesertTools): maintained native mods and shared code
-- Horse Tap Brake 1.0.2: chart state, velocity and key query reads, and update-safe lookups. See `findings/offsets.md`
+- Horse Tap Brake 1.0.2: chart state, velocity and key query reads, update-safe lookups, and the tap-to-slow idea and
+  its release condition, with its author's permission. The slowdown itself zeroes the stick instead of holding the brake. See `findings/offsets.md`
 - [CrimsonDesertModdingTools](https://github.com/NattKh/CrimsonDesertModdingTools): field names for static tables in `schemas/`. Its `vehicleinfo` and `characterinfo` mount parsers
   don't match this build's row layout, and its PAZ tools add nothing to CDMW and DMM
 - [Ghidra](https://github.com/NationalSecurityAgency/ghidra), [x64dbg](https://github.com/x64dbg/x64dbg),

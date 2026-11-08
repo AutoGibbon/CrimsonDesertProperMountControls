@@ -16,6 +16,7 @@ actual horse (I have never ridden a horse IRL but this feels like a good way to 
 
 - Horsie go where horsie look! You look but horsie not care. Horsie go where horsie look. (why am I writing like this?)
 - Change where horsie look with A and D (or stick). So easy.
+- Change horsie speed with tap on S / brake / back on stick, hold to slow down all the way.
 - Horsie can reverse now. Like... walk backwards. Waow.
 - Wagon go where horsie look!
 - Wagon reverse with S key (or down on stick). Still reverse with normal button too.
@@ -73,7 +74,8 @@ every game start, so save them before relaunching.
 ## Compatibility
 
 - Any mod that changes mount or riding inputs will probably conflict.
-- [Crimson Route](url=https://www.nexusmods.com/crimsondesert/mods/3175) - toggle this mod off when using auto run. Their automatic game inputs need the default camera coupled controls to work properly.
+- [Crimson Route](https://www.nexusmods.com/crimsondesert/mods/3175) - toggle this mod off when using auto run. Their automatic game inputs need the default camera coupled controls to work properly.
+- [Horse Tap Brake](https://www.nexusmods.com/crimsondesert/mods/3666) - not compatible. I done eated their mod to help make mine better (with permission).
 
 ## AI Disclosure
 
@@ -81,7 +83,9 @@ The code for this mod was written with Claude (Anthropic's AI).
 
 The design, documentation, reference material, testing approach, and silly sounding mod description was created by me.
 
-Zero functions or features of any other person's work were cloned, stolen, or directly replicated to make this mod.
+Zero functions of any other person's work were cloned, stolen, or directly replicated to make this mod. The one feature
+idea I borrowed is tap to slow down from Horse Tap Brake, with its author's permission, and it's built differently here
+(see Credits).
 
 ## Credits and Thanks
 
@@ -93,7 +97,9 @@ Horsie would not go where horsie look if not for these, so thank you for all you
 - [CrimsonDesertTools](https://github.com/tkhquang/CrimsonDesertTools) - native mod reference code
 - [CrimsonDesertModdingTools](https://github.com/NattKh/CrimsonDesertModdingTools) - game table field name research
 - [Horse Tap Brake](https://www.nexusmods.com/crimsondesert/mods/3666) - learned how to examine mount chart state,
-  velocity and key reads, and update-safe callsite lookups
+  velocity and key reads, and update-safe callsite lookups. Also the idea of tapping to slow down and when to let go,
+  used with its author's permission. Not a clone: Horse Tap Brake holds the game's brake for you, this mod lets go of
+  the stick for you, so it works on mounts that don't have a brake key in their animation packages.
 - [Crimson Save Editor](https://www.nexusmods.com/crimsondesert/mods/3748) - adding mounts to save files for testing
 - [DMM](https://www.nexusmods.com/crimsondesert/mods/633) - mod manager, used for install and testing
 - [SafetyHook](https://github.com/cursey/safetyhook) and [Zydis](https://github.com/zyantific/zydis) - function hooking

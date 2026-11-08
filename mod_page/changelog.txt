@@ -1,2 +1,6 @@
+Version 1.1.0
+Horsie can slow down now! Tap S, brake or back on stick to slow down a bit, hold to slow down all the way.
+Works on wagon and special mounts (the ones mentioned in description).
+
 Version 1.0.0
 hiya

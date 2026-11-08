@@ -20,6 +20,8 @@ From stage 19, the CSV's `flip` column and the log's `flip` lines are gone, and 
 
 From stage 21, the CSV ends with `raw_stick_x` and `raw_stick_y`, the mount input component's stick before the mod edits it, then `shift`, `brake_gap` (1 during a stick gap), `brake_assist` (the speed in m/s the position write is opposing) and `marker` (Insert presses so far). The `ini` line adds `brake test` and `assist per second`, and the log adds `brake gap start`, `brake gap end` and `marker` lines with `tick=`. With `Logging=1`, Insert also reloads `[BrakeTest]` from the ini, unless Insert is the toggle key.
 
+After stage 28, the CSV's `brake_assist` column and the `ini` line's `assist per second` are gone.
+
 From stage 22, the `ini` and `marker` lines add `release on speed`, `brake gap start` adds `target`, `brake gap end` can have the reason `speed`, and the log adds `gait value` lines.
 
 From stage 23, `[BrakeTest]`, Insert, the CSV's `marker` column and the log's `marker` and `gait value` lines are gone. The `ini` line drops `brake test` and `release on speed`, and `brake gap start` drops `target`.
@@ -72,4 +74,8 @@ From stage 24, the log adds `brake key press` lines, and `brake gap start` adds 
 | [stage-23](stage-23.md) | Tap and hold of S to slow every ground mount, the `[Slowdown]` setting, and the position write on longer drops | Passed on the horse, bear and wagon. No camel ride was logged |
 | [stage-24](stage-24.md) | The game's brake key starting the slowdown, with drift kept | Passed on the horse, camel and wagon, and drift kept, except that 7 of 22 horse taps from 5.2 to 12 kept their gait when the chart bounced out of the slowing state |
 | [stage-25](stage-25.md) | Brake key taps on the horse, needing two consecutive slowing states | Passed. 18 of 18 taps from 5.2 to 12 dropped one gait, 5 of them after a bounce |
+| [stage-26](stage-26.md) | The slowdown on the wagon, from S and the brake key at every speed | Passed, slowing from every speed with no jitter. Taps from 5.5 ran to the 3 s cap at about 1 m/s. With Shift held at top speed a tap does little |
+| [stage-27](stage-27.md) | A wagon tap at cruise ending below 5 m/s instead of on the time cap | Cruise passed, ending in 0.2 to 0.44 s. Taps from top speed lurched, jumping up to 2 m/s when the position write ended |
+| [stage-28](stage-28.md) | Wagon taps with the position write skipped | Passed. No lurch, and top-speed taps took about 1.5 s. The position write was then removed for every mount |
+| [stage-29](stage-29.md) | A slowdown ending once the mount is below 0.3 m/s | Passed on the bear. No time cap in 8 taps, and 2 ended on the new check |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |
