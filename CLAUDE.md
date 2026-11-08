@@ -1,9 +1,10 @@
 # Crimson Desert horse control mod
 
 Investigation into, and potentially a native ASI mod for, replicating RDR2's horse-relative controls in Crimson Desert.
-See `docs/status.md` for where the work stands and what's next, `docs/discovery.md` for requirements,
-`docs/findings/` for evidence by topic, `docs/horsesteer-tests/` for tests and their results, and `docs/horseprobe/` for
-the finished probe's docs.
+See `docs/status.md` first for where each piece of work stands and what's next. It links `docs/horsesteer-status.md` for
+land mounts and `docs/boats/status.md` for ships. `docs/discovery.md` has requirements,
+`docs/findings/` has evidence by topic, `docs/boats/` has ship evidence, `docs/horsesteer-tests/` has tests and their
+results, and `docs/horseprobe/` has the finished probe's docs.
 
 ## Paths
 
