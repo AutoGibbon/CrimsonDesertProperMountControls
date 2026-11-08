@@ -24,13 +24,14 @@ DMM copies the zip's ini to `bin64` only when there's none, and keeps an existin
 missing setting at startup, so a release that adds settings needs no player steps. Check settings in
 `bin64\ProperHorseControls.ini`.
 
-**Next session:** finish the S slowdown for release, starting with the two additions under "Slowing a mount with S".
+**Next session:** finish the S slowdown for release, starting with the wagon addition under "Slowing a mount with S".
 After that, player reports and the next game update. After an update, run `tools/check_lookups.py` on the new exe.
 
 ## In progress: slowing a mount with S
 
-Tapping S with W held, or pulling the stick back, slows the mount by writing 0 to the raw stick until the second change
-into a chart state whose value is 0 or missing, with no `key_brake`. The code is in `UpdateBrakeGap`, on every ground
+Tapping S with W held, pulling the stick back, or pressing the game's brake key with forward input held slows the mount
+by writing 0 to the raw stick until the second consecutive change into a chart state whose value is 0 or missing. The
+code is in `UpdateBrakeGap`, on every ground
 mount but the wagon, with the position write in `UpdateBrakeAssist`. Evidence is in `findings/charts-and-braking.md` (Slowing a mount with S), with tests in
 stages 21 to 23.
 
@@ -41,13 +42,11 @@ stages 21 to 23.
 - **S key:** read with `GetAsyncKeyState('S')`, which ignores rebinding, accepted until players report it.
 - **Stage 23:** passed on the horse, bear and wagon. The camel wasn't logged on this build.
 - **Limits accepted:** on non-horse mounts a tap lands where the chart lands, and the camel's 9.0 lands on 3.5.
-- **To add, brake key:** the game's brake key (Alt, mouse X2, gamepad B) should also start the slowdown. The tester
-  reversed the earlier decision, since a player who wants to drift does it on purpose. `OnKeyCondition` can't detect the
-  press, because it only runs when a chart reads `key_brake`, and most ride charts don't. The likely route is calling the
-  key query (slot 8, `findings/charts-and-braking.md`) with hash `0x377B9DB8` from `OnStickRead`, which also respects
-  rebinding and gamepads, but it's untested in this mod. Keep drift working: the drift branches need `key_brake` and
-  forward stick input, and `UpdateBrakeGap` already won't start with A or D held, and ends if they're pressed. Test Alt
-  with A or D at a gallop.
+- **Brake key:** done, passed [stages 24](horsesteer-tests/stage-24.md) and [25](horsesteer-tests/stage-25.md).
+  `BrakeKeyHeld` calls the key query, and Alt, mouse X2 and gamepad B all start the slowdown. Details are in
+  `findings/charts-and-braking.md` (Slowing a mount with the brake key). If taps ever fail to drop a gait again, the
+  untried fallback is answering `key_brake` as not held for the mount during the gap, in `OnKeyCondition`, so that Alt
+  gives the chart the same input as S.
 - **To add, wagons:** the tester wants the slowdown on wagons. Remove the `brakeMount` exclusion for S with W held, and
   keep S alone as reverse. W+S reads 0 on the stick, so it doesn't reach the brake reverse path. The wagon's chart treats
   `key_brake` as reverse, so what the real brake key should do on a moving wagon needs checking first, against node 43's
@@ -55,7 +54,8 @@ stages 21 to 23.
   moves a root transform.
 - **Preference:** don't make gamepad users worse off. Use the back stick wherever it's available.
 - **Before release:** credit Horse Tap Brake for the idea and release condition (`findings/offsets.md`),
-  and update the mod page, README and changelog.
+  and update the mod page, README and changelog. Horse Tap Brake also acts on Alt, so the compatibility section should
+  cover running both.
 
 ## Release work
 

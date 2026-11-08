@@ -90,6 +90,22 @@ elephant has no logged stops. The charts have 40 to 50 nodes, against the horse'
 
 The landing gait doesn't follow from the exit speed: the bear's 4.5 lands on 5.2, and the camel's 5.0 lands on 3.5.
 
+## Slowing a mount with the brake key
+
+From [stage 24](../horsesteer-tests/stage-24.md) and [stage 25](../horsesteer-tests/stage-25.md), on build `0x6AED2E85`.
+`tools/brake_gaps.py LOG CSV` tabulates each tap's start value, landing value, duration and whether it bounced.
+
+- **`key_brake` moves the chart early:** on the horse, the first change into the slowing state comes about 15 ms after
+  an Alt press, and about 95 ms after an S tap, which only zeroes the stick. This fits the `OR T10 key_brake` branches.
+- **Bounce:** on Alt only, the chart can leave the slowing state and return, such as `C2B2`, `C5AF`, `C2B2`, `C5AF`. Why
+  isn't known. Counting any two changes ended the gap at about 140 ms, and 7 of 22 taps from 5.2 to 12 kept their gait.
+  With two consecutive changes needed, 18 of 18 dropped one gait, 5 of them after a bounce.
+- **Slope:** not what separates them. All 7 failures were downhill, but so were 11 of the 15 taps that worked, including
+  the two steepest.
+- **Hold:** W and Alt held brought the horse to a stop. The camel slowed but didn't fully stop, which the tester accepted.
+- **Drift:** Alt with A or D, and Alt followed by A or D, still drift. All 7 steering presses logged had W released, so
+  a press with W and a steering key already held was never logged.
+
 ## Reading and overriding keys
 
 - **Key check:** `exe+0x3B0150` is the handler for condition type `0xEA`. The handler table comes from `exe+0x3A9FC0`, at index
@@ -111,4 +127,7 @@ The landing gait doesn't follow from the exit speed: the bear's 4.5 lands on 5.2
 - **Key hash (Horse Tap Brake, checked against this build's exe):** Jenkins lookup3 with seed `0xC5EDE` on the lowercase name,
   which reproduces the `key_brake` hash above. The mod overrides the result of the slot 8 call to hold a key, so the
   `0xEA` handler table doesn't need patching. This only covers actions read through that query, so it can't replace the stick
-  changes. Nothing here has been tested in game with `HorseSteer`.
+  changes.
+- **Key query in `HorseSteer`:** `BrakeKeyHeld` calls slot 8 from `OnStickRead`, and it answers for Alt, mouse X2 and
+  gamepad B in game. On build `0x6AED2E85` the query is `exe+0x30CBB40`. It only reads a key map, and the path to its
+  object is the one in the key check handler, `exe+0x3B0A30`, so the `keyCheck` signature covers the path and the slot.

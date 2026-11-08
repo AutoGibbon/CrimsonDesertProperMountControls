@@ -52,7 +52,7 @@ camera     = [[WorldSystem+0x18]+0x50]               the block the update copies
 
 ## From Horse Tap Brake 1.0.2
 
-A published ASI that makes a brake tap drop one gait. It was analysed statically and never loaded, and nothing here has been tested in game with `HorseSteer`. Its files and disassembly are in
+A published ASI that makes a brake tap drop one gait. It was analysed statically and never loaded. Of what's here, only its key query has been used in `HorseSteer`. Its files and disassembly are in
 `scratch/mods/HorseTapBrake-1.0.2/`. `tools/apply_htb.py ASI EXE` repeats its lookups on an exe and prints its key query signature, and `tools/asi_dis.py` disassembles an ASI. Its key query and
 key hash are in [charts-and-braking.md](charts-and-braking.md).
 

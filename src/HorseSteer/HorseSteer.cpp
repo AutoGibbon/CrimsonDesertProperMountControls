@@ -49,7 +49,7 @@ constexpr Signature kStickSiteSignature{
 // because another mod hooks the function's first bytes at runtime.
 constexpr Signature kKeyCheckSignature{
     "48 8B 48 68 48 8B 81 B0 01 00 00 80 B8 79 01 00 00 00 75 ?? 48 8B 05 ?? ?? ?? ?? 48 8B 88 D8 00 00 00 "
-    "48 8B 41 20 83 78 28 00",
+    "48 8B 41 20 83 78 28 00 77 04 33 C9 EB 08 48 8B 40 20 48 8B 48 10 48 8B 01 FF 50 40",
     -14};
 constexpr uint8_t kKeyCheckBytes[] = {0x48, 0x83, 0xEC, 0x28, 0x48, 0x8B, 0x02, 0x8B, 0x50, 0x08};
 // A call to the function that returns the chart condition handler table, in the code that checks a condition type is
@@ -58,6 +58,8 @@ constexpr Signature kConditionTableCallSignature{
     "E8 ?? ?? ?? ?? 81 FB 86 02 00 00 73 ?? 8D 8B 7D FF FF FF 48 8D 1C CD 00 00 00 00 48 83 3C 03 00", 0};
 constexpr size_t kKeyConditionSlot = 0xEA - 0x83;
 constexpr uint32_t kKeyBrakeHash = 0x377B9DB8;
+// The input object's vtable slot that takes a key hash and returns whether the key is held.
+constexpr size_t kKeyQuerySlot = 8;
 // Chart condition handlers return 0 when the condition holds.
 constexpr uint8_t kConditionHolds = 0;
 // mov rax,[rip+x]; mov rcx,[rax+0x30], which loads the WorldSystem global far more often than any other global.
@@ -785,18 +787,45 @@ void UpdateBraking(bool braking) {
     if (g_braking.exchange(braking) != braking) Log("brake reverse %s", braking ? "on" : "off");
 }
 
+// Return whether the game's brake key is held, asking the same input object as the chart key condition, so that
+// rebinding and gamepads count. Return false if g_keyCheck wasn't found or the object isn't available.
+bool BrakeKeyHeld() {
+    if (!g_keyCheck) return false;
+    const uintptr_t world = ReadPtr(g_base + g_worldSystemSlot);
+    const uintptr_t system = world ? ReadPtr(world + 0xD8) : 0;
+    const uintptr_t list = system ? ReadPtr(system + 0x20) : 0;
+    uint32_t count = 0;
+    if (!list || !Read(list + 0x28, count) || count == 0) return false;
+    const uintptr_t first = ReadPtr(list + 0x20);
+    const uintptr_t input = first ? ReadPtr(first + 0x10) : 0;
+    const uintptr_t vtable = input ? ReadPtr(input) : 0;
+    const uintptr_t query = vtable ? ReadPtr(vtable + kKeyQuerySlot * sizeof(uintptr_t)) : 0;
+    if (!query) return false;
+    __try {
+        return reinterpret_cast<bool (*)(uintptr_t, uint32_t)>(query)(input, kKeyBrakeHash);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
 // Return whether forward input should read as released, so that the chart slows the mount. This starts when S is pressed
-// with W held, or backward becomes true, while the mount is at kBrakeGapMinSpeed or above in a chart state with a value
-// above 0. It ends on the second change into a chart state whose value is 0 or missing, on steering, or after
-// kBrakeGapMaxMs.
-bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward) {
-    static bool sWas = false, backwardWas = false;
+// with W held, the brake key is pressed with forward true, or backward becomes true, while the mount is at
+// kBrakeGapMinSpeed or above in a chart state with a value
+// above 0. It ends on the second consecutive change into a chart state whose value is 0 or missing, on steering,
+// or after kBrakeGapMaxMs.
+bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward) {
+    static bool sWas = false, backwardWas = false, brakeWas = false;
     static uintptr_t lastState = 0;
     static int slowingStates = 0;
     static ULONGLONG start = 0;
 
     const bool s = GameFocused() && KeyDown('S');
-    const bool pressed = (s && !sWas && KeyDown('W')) || (backward && !backwardWas);
+    const bool brake = BrakeKeyHeld();
+    const bool brakePressed = brake && !brakeWas;
+    const bool sPressed = s && !sWas && KeyDown('W');
+    const bool backwardPressed = backward && !backwardWas;
+    const bool pressed = sPressed || backwardPressed || (brakePressed && forward);
+    brakeWas = brake;
     sWas = s;
     backwardWas = backward;
     uintptr_t state = 0;
@@ -804,6 +833,10 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward) {
     const bool haveState = ReadChartState(ride.mount, state, value);
     const ULONGLONG now = GetTickCount64();
     const float speed = g_mountSpeed.load();
+    if (brakePressed) {
+        Log("brake key press tick=%llu forward=%d steering=%d speed=%.2f value=%.3f", now, forward ? 1 : 0,
+            steering ? 1 : 0, speed, value);
+    }
     if (!g_brakeGap.load()) {
         if (!pressed || steering || speed < kBrakeGapMinSpeed || !haveState || value <= 0.0f ||
             g_backwardWalking.load()) {
@@ -814,13 +847,14 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward) {
         lastState = state;
         slowingStates = 0;
         start = now;
-        Log("brake gap start tick=%llu speed=%.2f value=%.3f state=%04X shift=%d", now, speed, value,
-            static_cast<uint16_t>(state), KeyDown(VK_SHIFT) ? 1 : 0);
+        Log("brake gap start tick=%llu speed=%.2f value=%.3f state=%04X shift=%d source=%s", now, speed, value,
+            static_cast<uint16_t>(state), KeyDown(VK_SHIFT) ? 1 : 0,
+            sPressed ? "S" : backwardPressed ? "stick" : "brake key");
         return true;
     }
     if (haveState && state != lastState) {
         lastState = state;
-        if (value == 0.0f || value == kMissing) ++slowingStates;
+        slowingStates = value == 0.0f || value == kMissing ? slowingStates + 1 : 0;
     }
     const char* reason = slowingStates >= 2 ? "next state" : steering ? "steering" : nullptr;
     if (!reason && now - start >= kBrakeGapMaxMs) reason = "time cap";
@@ -867,7 +901,7 @@ void OnStickRead(SafetyHookContext& ctx) {
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
         return;
     }
-    if (!brakeMount && UpdateBrakeGap(ride, std::fabs(stick[0]) > kBrakeGapSteerX, backward)) {
+    if (!brakeMount && UpdateBrakeGap(ride, std::fabs(stick[0]) > kBrakeGapSteerX, backward, stick[1] > 0.0f)) {
         UpdateBackwardPulse(false);
         stick[0] = stick[1] = 0.0f;
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
@@ -1281,7 +1315,7 @@ bool LookupWorldSystemSlot() {
 }
 
 // Run every lookup and log each result. Return whether the mod can run. The key check and condition table are left out
-// of that, because without them only the brake reverse is lost.
+// of that, because without them only the brake reverse and the brake key's slowdown are lost.
 bool RunLookups() {
     const ULONGLONG start = GetTickCount64();
     bool ok = LookupVtable("vtActorManager", kClassActorManager, g_vtActorManager);

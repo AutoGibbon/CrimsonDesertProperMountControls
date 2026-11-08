@@ -24,6 +24,8 @@ From stage 22, the `ini` and `marker` lines add `release on speed`, `brake gap s
 
 From stage 23, `[BrakeTest]`, Insert, the CSV's `marker` column and the log's `marker` and `gait value` lines are gone. The `ini` line drops `brake test` and `release on speed`, and `brake gap start` drops `target`.
 
+From stage 24, the log adds `brake key press` lines, and `brake gap start` adds `source`.
+
 ## Tests
 
 | Test | Checks | Result |
@@ -68,4 +70,6 @@ From stage 23, `[BrakeTest]`, Insert, the CSV's `marker` column and the log's `m
 | [stage-21](stage-21.md) | W+S raw stick, gait after a stick gap, and a position write against forward motion | W+S reads 0. On the horse, a stick gap dropped one gait in 48 of 48 taps. The position write reached at most 1.1 m/s, and only ran during the gap. On the bear and camel, taps from high gaits landed two or three gaits down |
 | [stage-22](stage-22.md) | Ending a stick gap at the next lower gait's speed, on the bear and camel, with and without the position write | Bear: 12 of 12 taps landed one gait lower. Camel: 3.5 to 2.6 worked, but 9.0 landed on 3.5. The lowest gait still runs to the 3 s cap. Feet looked fine with the write |
 | [stage-23](stage-23.md) | Tap and hold of S to slow every ground mount, the `[Slowdown]` setting, and the position write on longer drops | Passed on the horse, bear and wagon. No camel ride was logged |
+| [stage-24](stage-24.md) | The game's brake key starting the slowdown, with drift kept | Passed on the horse, camel and wagon, and drift kept, except that 7 of 22 horse taps from 5.2 to 12 kept their gait when the chart bounced out of the slowing state |
+| [stage-25](stage-25.md) | Brake key taps on the horse, needing two consecutive slowing states | Passed. 18 of 18 taps from 5.2 to 12 dropped one gait, 5 of them after a bounce |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

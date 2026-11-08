@@ -28,7 +28,7 @@ SIGNATURES = {
     # Starts 14 bytes into the function, because another mod hooks its first bytes at runtime.
     "keyCheck": (
         "48 8B 48 68 48 8B 81 B0 01 00 00 80 B8 79 01 00 00 00 75 ?? 48 8B 05 ?? ?? ?? ?? 48 8B 88 D8 00 00 00 "
-        "48 8B 41 20 83 78 28 00",
+        "48 8B 41 20 83 78 28 00 77 04 33 C9 EB 08 48 8B 40 20 48 8B 48 10 48 8B 01 FF 50 40",
         -14,
     ),
     # A call to the chart condition handler table's getter.

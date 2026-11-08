@@ -36,6 +36,7 @@ put it in `3A73F`, and normal states followed.
 - **GPU crash while alt-tabbing (stage 5h, `scratch/probe-runs/stage5h/`):** device removed (`887A0006`) inside D3D12, with `renodx` and the
   Nvidia driver on the stack and no mod code. The tester then removed OptiScaler, and no crash dump has been written since, through stage 6.
 - **Stage 22 crash (`scratch/probe-runs/stage22-crash/`):** an access violation while a `std::vector` grew inside `OnStickRead`, on the second value the first build of `UpdateBrakeGap` tried to add. Windows reports it in `KERNELBASE!RaiseException` because the vector's cleanup rethrows, and the real stack is in the dump at `%LOCALAPPDATA%\CrashDumps`. The likely cause, not proven, is the hook running on more than one thread. Keep containers and other allocating state out of the hooks, and have `ModThread` write anything they read.
+- **Freeze before stage 24 (`scratch/probe-runs/stage24-crash/`):** an `AppHangB1` about 45 s after the hooks were installed, with no dump. The log has no `mounted=` line, so `BrakeKeyHeld` hadn't run. The cause is unknown, and it didn't recur in stages 24 and 25.
 - **HorseProbe freezes:** the game froze near the end of the F10 write watch in run 1, during Esc and Alt+Tab, with a probe cause not ruled out.
   A freeze at 13:57 was logged by Windows as an application hang (`AppHangB1`), not a crash.
 
