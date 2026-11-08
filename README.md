@@ -94,6 +94,7 @@ Horsie would not go where horsie look if not for these, so thank you for all you
 - [CrimsonDesertModdingTools](https://github.com/NattKh/CrimsonDesertModdingTools) - game table field name research
 - [Horse Tap Brake](https://www.nexusmods.com/crimsondesert/mods/3666) - learned how to examine mount chart state,
   velocity and key reads, and update-safe callsite lookups
+- [Crimson Save Editor](https://www.nexusmods.com/crimsondesert/mods/3748) - adding mounts to save files for testing
 - [DMM](https://www.nexusmods.com/crimsondesert/mods/633) - mod manager, used for install and testing
 - [SafetyHook](https://github.com/cursey/safetyhook) and [Zydis](https://github.com/zyantific/zydis) - function hooking
 
