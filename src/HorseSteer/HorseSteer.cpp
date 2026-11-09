@@ -145,6 +145,7 @@ constexpr float kBrakeMountEndSpeed = 5.0f;
 
 constexpr float kMissing = -9999.0f;
 constexpr float kRadToDeg = 57.29578f;
+constexpr float kHalfPi = 1.5707964f;
 
 struct Vec3 {
     float x, y, z;
@@ -195,6 +196,9 @@ volatile uint64_t* g_rodeoCalls = nullptr;
 std::atomic<float> g_backwardRate{kBackwardRatePerSpeed};
 // Whether A and D curve the backward walk and the brake reverse the opposite way.
 std::atomic<bool> g_backwardSteerInvert{true};
+// Share of the angle from straight back to straight sideways, 0 to 1, within which OnStickRead treats an analog stick as
+// straight back, because the game turns a mount at its full rate for any non-zero sideways input.
+std::atomic<float> g_reverseDeadzone{0.30f};
 std::atomic<ULONGLONG> g_backwardPulseEnd{0};
 std::atomic<bool> g_backwardWanted{false};
 std::atomic<bool> g_backwardWalking{false};
@@ -476,7 +480,7 @@ int ParseKeyName(const std::wstring& name) {
     return 0;
 }
 
-// Replace the backward speeds, reverse steering invert, toggle key and slowdown assist with any values in the ini at
+// Replace the backward speeds, reverse steering invert, stick deadzone and toggle key with any values in the ini at
 // path, write each setting it lacks with its default, so that an ini from an earlier version gains new settings, and log
 // what's in use.
 void LoadSettings(const std::wstring& path) {
@@ -517,6 +521,13 @@ void LoadSettings(const std::wstring& path) {
     } else {
         addMissing(L"Reverse", L"InvertSteer", g_backwardSteerInvert.load() ? L"1" : L"0");
     }
+    float deadzone = g_reverseDeadzone.load();
+    if (read(L"Reverse", L"StickDeadzone", deadzone, 0.0f, 1.0f)) {
+        g_reverseDeadzone = deadzone;
+        ++found;
+    } else {
+        addMissing(L"Reverse", L"StickDeadzone", L"0.30");
+    }
     std::wstring keyName = L"F5";
     if (readText(L"Keys", L"Toggle")) {
         ++found;
@@ -530,8 +541,8 @@ void LoadSettings(const std::wstring& path) {
         addMissing(L"Keys", L"Toggle", L"F5");
     }
     if (!readText(L"Debug", L"Logging")) addMissing(L"Debug", L"Logging", L"0");
-    Log("ini: %d values read, %d added, invert %d, toggle key %ls", found, added, g_backwardSteerInvert.load() ? 1 : 0,
-        keyName.c_str());
+    Log("ini: %d values read, %d added, invert %d, deadzone %.2f, toggle key %ls", found, added,
+        g_backwardSteerInvert.load() ? 1 : 0, g_reverseDeadzone.load(), keyName.c_str());
 }
 
 // Return whether the taming minigame's UI was updated within kRodeoTimeoutMs.
@@ -840,10 +851,14 @@ void OnStickRead(SafetyHookContext& ctx) {
         g_rawStickX = stick[0];
         g_rawStickY = stick[1];
     }
+    const bool digital = DigitalStick(stick[0], stick[1]);
+    if (stick[1] < 0.0f && !digital &&
+        std::atan2(std::fabs(stick[0]), -stick[1]) <= g_reverseDeadzone.load() * kHalfPi) {
+        stick[0] = 0.0f;
+    }
     const float heldMs = SteerHeldMs(stick[0]);
     const bool backward = stick[1] < kBackwardStickY;
     const bool steering = std::fabs(stick[0]) > 0.01f;
-    const bool digital = DigitalStick(stick[0], stick[1]);
     if (steering) LogStickKind(stick[0], stick[1], digital);
     const bool brakeMount = ride.mount == g_brakeMount.load();
     UpdateBraking(brakeMount && backward);
