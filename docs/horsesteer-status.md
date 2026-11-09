@@ -21,7 +21,7 @@ and it's the only build in `KNOWN` in `tools/check_lookups.py`.
 Work is on `main`. v1.0.0 is the first Nexus release, as Proper Horse Controls: the zip from `tools/pack.py`,
 with the page text in `mod_page/description.bbcode`. v1.1.0 adds the slowdown. It's tagged `1.1.0` and packed as
 `build/ProperHorseControls-1.1.0.zip`, and is on Nexus. v1.2.0 adds `StickDeadzone`, the feature flags and `Reload`. It's
-packed as `build/ProperHorseControls-1.2.0.zip`, and isn't tagged or on Nexus yet.
+tagged `1.2.0` and packed as `build/ProperHorseControls-1.2.0.zip`, and isn't on Nexus yet.
 `DMM\mods\ProperHorseControls.asi` matches the source. The old
 `HorseSteer.*` files are still in `DMM\mods` and `bin64`, so `HorseSteer` must stay off in DMM to avoid loading two
 copies.
@@ -30,7 +30,7 @@ DMM copies the zip's ini to `bin64` only when there's none, and keeps an existin
 missing setting at startup, so a release that adds settings needs no player steps. Check settings in
 `bin64\ProperHorseControls.ini`.
 
-**Next:** player reports and the next game update. After an update, run `tools/check_lookups.py` on the new exe.
+**Next:** upload v1.2.0 to Nexus, then player reports and the next game update. After an update, run `tools/check_lookups.py` on the new exe.
 
 ## Slowing a mount with S
 
