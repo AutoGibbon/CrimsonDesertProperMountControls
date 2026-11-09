@@ -5,7 +5,9 @@
 // brake key. Tapping S with W held slows the mount by a gait. All of this stops while the taming minigame runs, because
 // it needs the game's own input directions.
 //
-// F5, or the key set by Toggle under [Keys] in ProperHorseControls.ini, toggles the mod.
+// F5, or the key set by Toggle under [Keys] in ProperHorseControls.ini, toggles the mod. CameraDetached and TapBrake
+// under [Features] turn off the mount-relative controls and the slowdown separately. End, or the key set by Reload under
+// [Keys], reads the ini again.
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -28,7 +30,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.1.0";
+constexpr const char* kVersion = "1.2.0";
 
 // A code signature with ?? for bytes that vary, and the target's distance from its first byte, which must be literal.
 // tools/check_lookups.py runs the same lookups on saved exes, so change both together.
@@ -185,6 +187,7 @@ uintptr_t g_conditionTableCall = 0;
 std::atomic<bool> g_enabled{true};
 // The virtual-key code that toggles the mod, set by LoadSettings before ModThread's key loop starts.
 int g_toggleKey = VK_F5;
+int g_reloadKey = VK_END;
 InputSample g_samples[2];
 SafetyHookMid g_hook;
 SafetyHookMid g_stickHook;
@@ -199,6 +202,10 @@ std::atomic<bool> g_backwardSteerInvert{true};
 // Share of the angle from straight back to straight sideways, 0 to 1, within which OnStickRead treats an analog stick as
 // straight back, because the game turns a mount at its full rate for any non-zero sideways input.
 std::atomic<float> g_reverseDeadzone{0.30f};
+// Whether move input is relative to the mount, with widened steering, the backward walk and the wagon's reverse.
+std::atomic<bool> g_cameraDetached{true};
+// Whether UpdateBrakeGap can slow the mount.
+std::atomic<bool> g_tapBrake{true};
 std::atomic<ULONGLONG> g_backwardPulseEnd{0};
 std::atomic<bool> g_backwardWanted{false};
 std::atomic<bool> g_backwardWalking{false};
@@ -443,7 +450,7 @@ std::string ReadAppearance(uintptr_t mount) {
     return second ? ReadText(second + 0x18) : std::string();
 }
 
-// Key names accepted by Toggle under [Keys], besides F1 to F24, A to Z, 0 to 9 and Numpad0 to Numpad9.
+// Key names accepted by Toggle and Reload under [Keys], besides F1 to F24, A to Z, 0 to 9 and Numpad0 to Numpad9.
 constexpr struct {
     const wchar_t* name;
     int vk;
@@ -480,9 +487,9 @@ int ParseKeyName(const std::wstring& name) {
     return 0;
 }
 
-// Replace the backward speeds, reverse steering invert, stick deadzone and toggle key with any values in the ini at
-// path, write each setting it lacks with its default, so that an ini from an earlier version gains new settings, and log
-// what's in use.
+// Replace the backward speeds, feature flags, reverse steering invert, stick deadzone, toggle key and reload key with
+// any values in the ini at path, write each setting it lacks with its default, so that an ini from an earlier version
+// gains new settings, and log what's in use.
 void LoadSettings(const std::wstring& path) {
     wchar_t text[32];
     const auto readText = [&](const wchar_t* section, const wchar_t* key) {
@@ -504,6 +511,16 @@ void LoadSettings(const std::wstring& path) {
         }
     };
     int found = 0;
+    const auto readFeature = [&](const wchar_t* key, std::atomic<bool>& flag) {
+        if (readText(L"Features", key)) {
+            flag = wcstol(text, nullptr, 10) != 0;
+            ++found;
+        } else {
+            addMissing(L"Features", key, flag.load() ? L"1" : L"0");
+        }
+    };
+    readFeature(L"CameraDetached", g_cameraDetached);
+    readFeature(L"TapBrake", g_tapBrake);
     for (GroundMount& mount : g_groundMounts) {
         const std::string name(mount.package);
         const std::wstring key(name.begin(), name.end());
@@ -528,21 +545,29 @@ void LoadSettings(const std::wstring& path) {
     } else {
         addMissing(L"Reverse", L"StickDeadzone", L"0.30");
     }
-    std::wstring keyName = L"F5";
-    if (readText(L"Keys", L"Toggle")) {
-        ++found;
-        if (const int vk = ParseKeyName(text)) {
-            g_toggleKey = vk;
-            keyName = text;
-        } else {
-            LogProblem("ini: Toggle=%ls isn't an accepted key, so F5 toggles the mod", text);
+    const auto readKey = [&](const wchar_t* key, const wchar_t* defaultName, int defaultVk, int& vk) {
+        vk = defaultVk;
+        std::wstring name = defaultName;
+        if (!readText(L"Keys", key)) {
+            addMissing(L"Keys", key, defaultName);
+            return name;
         }
-    } else {
-        addMissing(L"Keys", L"Toggle", L"F5");
-    }
+        ++found;
+        if (const int parsed = ParseKeyName(text)) {
+            vk = parsed;
+            name = text;
+        } else {
+            LogProblem("ini: %ls=%ls isn't an accepted key, so %ls is used", key, text, defaultName);
+        }
+        return name;
+    };
+    const std::wstring toggleName = readKey(L"Toggle", L"F5", VK_F5, g_toggleKey);
+    const std::wstring reloadName = readKey(L"Reload", L"End", VK_END, g_reloadKey);
     if (!readText(L"Debug", L"Logging")) addMissing(L"Debug", L"Logging", L"0");
-    Log("ini: %d values read, %d added, invert %d, deadzone %.2f, toggle key %ls", found, added,
-        g_backwardSteerInvert.load() ? 1 : 0, g_reverseDeadzone.load(), keyName.c_str());
+    Log("ini: %d values read, %d added, camera detached %d, tap brake %d, invert %d, deadzone %.2f, toggle key %ls, "
+        "reload key %ls",
+        found, added, g_cameraDetached.load() ? 1 : 0, g_tapBrake.load() ? 1 : 0, g_backwardSteerInvert.load() ? 1 : 0,
+        g_reverseDeadzone.load(), toggleName.c_str(), reloadName.c_str());
 }
 
 // Return whether the taming minigame's UI was updated within kRodeoTimeoutMs.
@@ -675,7 +700,9 @@ void OnInputUpdate(SafetyHookContext& ctx) {
     sample.relative = relative * kRadToDeg;
 
     bool applied = false;
-    if (RidingGroundMount(ride) && ride.haveForward) applied = ApplyMountDirection(input, ride, sample);
+    if (RidingGroundMount(ride) && ride.haveForward && g_cameraDetached.load()) {
+        applied = ApplyMountDirection(input, ride, sample);
+    }
     sample.applied = applied;
     if (RidingGroundMount(ride) && actor == ride.mount) {
         UpdateBackwardWalk(ride);
@@ -832,7 +859,8 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
 // and widen forward steering. S alone starts the backward walk, and A or D during it steers. On g_brakeMount, S brakes
 // instead, which the chart takes as reverse, and A or D pass through as they do with the brake key. In both reverses,
 // g_backwardSteerInvert swaps A and D. Forward steering ramps in only for digital input, as an analog stick already moves
-// gradually.
+// gradually. With g_cameraDetached off, the only edit is the zeroed stick of a UpdateBrakeGap slowdown, which needs
+// g_tapBrake.
 void OnStickRead(SafetyHookContext& ctx) {
     const Ride ride = ResolveRide();
     if (!RidingGroundMount(ride)) {
@@ -850,6 +878,17 @@ void OnStickRead(SafetyHookContext& ctx) {
     if (Read(ctx.rdi + kInput_Actor, inputActor) && inputActor == ride.mount) {
         g_rawStickX = stick[0];
         g_rawStickY = stick[1];
+    }
+    if (!g_tapBrake.load()) g_brakeGap = false;
+    if (!g_cameraDetached.load()) {
+        UpdateBackwardPulse(false);
+        UpdateBraking(false);
+        // The stick's direction is relative to the camera here, so it says nothing about steering or backward input.
+        if (g_tapBrake.load() && UpdateBrakeGap(ride, false, false, std::hypot(stick[0], stick[1]) > 0.01f)) {
+            stick[0] = stick[1] = 0.0f;
+            SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
+        }
+        return;
     }
     const bool digital = DigitalStick(stick[0], stick[1]);
     if (stick[1] < 0.0f && !digital &&
@@ -869,7 +908,7 @@ void OnStickRead(SafetyHookContext& ctx) {
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
         return;
     }
-    if (UpdateBrakeGap(ride, std::fabs(stick[0]) > kBrakeGapSteerX, backward, stick[1] > 0.0f)) {
+    if (g_tapBrake.load() && UpdateBrakeGap(ride, std::fabs(stick[0]) > kBrakeGapSteerX, backward, stick[1] > 0.0f)) {
         UpdateBackwardPulse(false);
         stick[0] = stick[1] = 0.0f;
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
@@ -1350,7 +1389,7 @@ DWORD WINAPI ModThread(void* param) {
     Sleep(20000);
     if (!InstallHook()) return 0;
 
-    bool toggleWas = false, wasMounted = false, wasFromMount = false, wasRodeo = false;
+    bool toggleWas = false, reloadWas = false, wasMounted = false, wasFromMount = false, wasRodeo = false;
     uintptr_t seen[2] = {};
     uintptr_t currentMount = 0;
     bool classified = false, reportedUnknown = false;
@@ -1364,6 +1403,14 @@ DWORD WINAPI ModThread(void* param) {
             Log("mod %s", g_enabled.load() ? "enabled" : "disabled");
         }
         toggleWas = toggle;
+        const bool reload = GameFocused() && KeyDown(g_reloadKey);
+        if (reload && !reloadWas) {
+            Log("reloading settings");
+            LoadSettings(settings);
+            // Classify the current mount again, so that g_backwardRate takes its new backward speed.
+            classified = false;
+        }
+        reloadWas = reload;
         if (g_logging) LogStateChange();
 
         const ULONGLONG now = GetTickCount64();

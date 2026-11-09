@@ -5,10 +5,12 @@ Where the land mount mod stands and what to do next. Requirements are in [discov
 
 ## Status
 
-`src/HorseSteer` (v1.1.0, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
+`src/HorseSteer` (v1.2.0, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
 and S alone walks the mount backward, on the horse and the 12 other mounts reached, with no setup. On the wagon, S
 reverses it through the game's brake key, and A or D steer as in the game. Tapping S with W held, the brake key or
-back on the stick slows any of them. The mod pauses during the taming minigame.
+back on the stick slows any of them. The mod pauses during the taming minigame. `CameraDetached` and `TapBrake` under
+`[Features]` turn off the mount-relative controls and the slowdown separately, and `Reload` under `[Keys]`, End by
+default, reads the ini again in game.
 
 It finds its addresses at startup, and every lookup matched on the two game updates since build 26423880, up to PE timestamp
 `0x6AED2E85` (2026-11-06). A copy of that exe is in `scratch/exe-baseline/`,
@@ -18,7 +20,8 @@ and it's the only build in `KNOWN` in `tools/check_lookups.py`.
 
 Work is on `main`. v1.0.0 is the first Nexus release, as Proper Horse Controls: the zip from `tools/pack.py`,
 with the page text in `mod_page/description.bbcode`. v1.1.0 adds the slowdown. It's tagged `1.1.0` and packed as
-`build/ProperHorseControls-1.1.0.zip`, and is on Nexus.
+`build/ProperHorseControls-1.1.0.zip`, and is on Nexus. v1.2.0 adds `StickDeadzone`, the feature flags and `Reload`. It's
+packed as `build/ProperHorseControls-1.2.0.zip`, and isn't tagged or on Nexus yet.
 `DMM\mods\ProperHorseControls.asi` matches the source. The old
 `HorseSteer.*` files are still in `DMM\mods` and `bin64`, so `HorseSteer` must stay off in DMM to avoid loading two
 copies.
@@ -56,6 +59,22 @@ stages 21 to 29.
 - **Preference:** don't make gamepad users worse off. Use the back stick wherever it's available.
 - **Credit:** the mod page and README credit Horse Tap Brake for the idea and release condition (`findings/offsets.md`),
   say how this mod differs, and list it as not compatible. The changelog is at 1.1.0.
+
+## Settings added in v1.2.0
+
+- **`StickDeadzone`:** `OnStickRead` zeroes x on an analog stick within this share of the angle from straight back to
+  sideways, 0.30 or about 27°, because the game turns a mount at its full rate of about 64°/s for any non-zero x. Passed
+  [stage 30](horsesteer-tests/stage-30.md) on the horse. The wagon wasn't reached. Past the deadzone the turn is on or off.
+- **`CameraDetached=0`:** the only stick edit left is the slowdown's zeroed stick. The slowdown then starts from S with W
+  held, or the brake key with any stick input, with no steering check, because a sideways stick there says nothing about
+  steering. Passed [stage 31](horsesteer-tests/stage-31.md).
+- **`TapBrake=0`:** `UpdateBrakeGap` isn't called. Passed stage 31. With both flags off the mod matches the toggle being
+  off.
+- **`Reload`:** applies everything but `Logging`, and a new backward speed applies to the current mount. Worked twice mid
+  ride in stage 31. The rest of [stage 32](horsesteer-tests/stage-32.md) hasn't been run.
+- **Stage 31's one odd slowdown:** a tap from 12.0 dropped two gaits, because the chart passed through `C2B2` and reset the
+  count in `UpdateBrakeGap`. The horse was already slow, and the tester suspects a collision. Left as is unless it happens
+  on open ground.
 
 ## Release work
 
@@ -107,6 +126,7 @@ All done for v1.0.0.
 
 ## Ideas
 
-- A true reverse turn rate setting, which would be new work (see `findings/backward-walk.md`).
+- A true reverse turn rate setting, which would be new work (see `findings/backward-walk.md`). Writing the mount's
+  rotation is ruled out, as it wouldn't work well with the reverse turn animation.
 - The key query and slot callback (`findings/offsets.md`, `findings/charts-and-braking.md`) and the other movement
   classes (`findings/mounts-and-vehicles.md`, Leads) are leads, not planned work.

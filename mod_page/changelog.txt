@@ -1,3 +1,8 @@
+Version 1.2.0
+Controller reverse fixed! Little bit of stick wobble no more make horsie spin forever. New StickDeadzone setting if you want more or less of that.
+Don't want horsie go where horsie look, or don't want tap to slow down? Now you can turn either one off in the ini.
+Press End to reload the ini while playing. No more restart game every time.
+
 Version 1.1.0
 Horsie can slow down now! Tap S, brake or back on stick to slow down a bit, hold to slow down all the way.
 Works on wagon and special mounts (the ones mentioned in description).

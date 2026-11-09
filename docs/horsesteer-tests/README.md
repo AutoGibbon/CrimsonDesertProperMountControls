@@ -28,7 +28,7 @@ From stage 23, `[BrakeTest]`, Insert, the CSV's `marker` column and the log's `m
 
 From stage 24, the log adds `brake key press` lines, and `brake gap start` adds `source`.
 
-From stage 30, the `ini` line adds `deadzone`.
+From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera detached` and `tap brake`. From stage 32, it adds `reload key`, and the log adds a `reloading settings` line before each `ini` line after the first.
 
 ## Tests
 
@@ -81,4 +81,6 @@ From stage 30, the `ini` line adds `deadzone`.
 | [stage-28](stage-28.md) | Wagon taps with the position write skipped | Passed. No lurch, and top-speed taps took about 1.5 s. The position write was then removed for every mount |
 | [stage-29](stage-29.md) | A slowdown ending once the mount is below 0.3 m/s | Passed on the bear. No time cap in 8 taps, and 2 ended on the new check |
 | [stage-30](stage-30.md) | `StickDeadzone`: a gamepad pulled back slightly off center walking backward instead of spinning | Passed on the horse. Straight pulls had no yaw change and 5 stick taps each dropped a gait. The wagon wasn't run |
+| [stage-31](stage-31.md) | `CameraDetached` and `TapBrake` feature flags in each new combination | Passed on the horse. 23 slowdowns with camera-relative input, 22 dropping one gait |
+| [stage-32](stage-32.md) | The `Reload` key reading the ini while the game runs | Not run |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

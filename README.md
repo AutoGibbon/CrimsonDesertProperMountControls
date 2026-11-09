@@ -38,14 +38,31 @@ feedback wanted.</sub>
 <summary>All settings</summary>
 
 _This is all documented inside the **.ini**, but I know some folks want to know everything possible about a mod before
-they choose to try it out. Restart game after editing your **.ini** file._
+they choose to try it out. Press **End** in game after editing your **.ini** file to reload. Only
+Logging still needs a game restart._
+
+**`[Features] CameraDetached`**
+The whole point of the mod. Default 1. Set 0 and horsie go where camera look again, like base game. Also turns off
+walking backwards, wagon S reverse and back on stick to slow down.
+
+**`[Features] TapBrake`**
+Tap S, brake or back on stick to slow down. Default 1, set 0 to turn it off. If CameraDetached is off, tap S (with W
+held) and brake still work, but back on stick is just the game's normal go that way.
 
 **`[Keys] Toggle`**
 Key to turn the mod on/off. Default F5. F1-F24, A-Z, 0-9, Numpad0-Numpad9, Insert, Delete, Home, End, PageUp, PageDown,
 Pause or ScrollLock. Not W, A, S or D.
 
+**`[Keys] Reload`**
+Key to reload your **.ini** while playing. Default End. Takes the same keys as Toggle. Make it the same key as Toggle and
+that key does both, so maybe don't.
+
 **`[Reverse] InvertSteer`**
 Which way A and D turn horsie when reversing. Default 1, set 0 to flip it. Works on wagon too.
+
+**`[Reverse] StickDeadzone`**
+How far you can lean the stick sideways and it still counts as straight back, 0 to 1. Default 0.30. 0 is no leeway, 0.5
+is a 45 degree lean, 1 ignores left and right while pulling back. Horsie spin when you wanted reverse? Need more bigger deadzone.
 
 **`[BackwardSpeed]`**
 How fast each kind of mount walks backward, 0.2 to 6 m/s. Ibex uses the horse value, snow deer uses reindeer, tiger and
