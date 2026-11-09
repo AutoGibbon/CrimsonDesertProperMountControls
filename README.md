@@ -94,6 +94,28 @@ every game start, so save them before relaunching.
 - [Crimson Route](https://www.nexusmods.com/crimsondesert/mods/3175) - toggle this mod off when using auto run. Their automatic game inputs need the default camera coupled controls to work properly.
 - [Horse Tap Brake](https://www.nexusmods.com/crimsondesert/mods/3666) - not compatible. I done eated their mod to help make mine better (with permission).
 
+## For mod authors
+
+If your mod drives the mount by itself, like auto run, you can suspend ProperHorseControls using the snippet below. It
+is safe to call even if ProperHorseControls is not installed. Function is threadsafe and idempotent.
+
+```cpp
+// suspended: 1 = true, 0 = false.
+// If you never send 0 after suspending PHC, it remains suspended until the game is closed.
+// Don't call this at startup. ASI load order isn't guaranteed, so PHC may not be loaded yet and the lookup will fail.
+void SetPhcSuspended(int32_t suspended) {
+    using SetSuspended = void (*)(const char* owner, int32_t suspended);
+    if (HMODULE phc = GetModuleHandleW(L"ProperHorseControls.asi")) {
+        if (auto set = reinterpret_cast<SetSuspended>(GetProcAddress(phc, "PHC_SetSuspended"))) {
+            // Replace YourModName with your mod's name. Names are truncated to 31 characters.
+            // If several mods suspend PHC, it stays suspended until all of them have sent 0.
+            // It tracks up to 16 mods and ignores any more.
+            set("YourModName", suspended);
+        }
+    }
+}
+```
+
 ## AI Disclosure
 
 The code for this mod was written with Claude (Anthropic's AI).

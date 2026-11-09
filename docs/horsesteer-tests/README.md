@@ -28,7 +28,7 @@ From stage 23, `[BrakeTest]`, Insert, the CSV's `marker` column and the log's `m
 
 From stage 24, the log adds `brake key press` lines, and `brake gap start` adds `source`.
 
-From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera detached` and `tap brake`. From stage 32, it adds `reload key`, and the log adds a `reloading settings` line before each `ini` line after the first.
+From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera detached` and `tap brake`. From stage 32, it adds `reload key`, and the log adds a `reloading settings` line before each `ini` line after the first. From stage 33, the log adds `suspended by` and `resumed by` lines with the owner and the number of owners holding.
 
 ## Tests
 
@@ -83,4 +83,5 @@ From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera de
 | [stage-30](stage-30.md) | `StickDeadzone`: a gamepad pulled back slightly off center walking backward instead of spinning | Passed on the horse. Straight pulls had no yaw change and 5 stick taps each dropped a gait. The wagon wasn't run |
 | [stage-31](stage-31.md) | `CameraDetached` and `TapBrake` feature flags in each new combination | Passed on the horse. 23 slowdowns with camera-relative input, 22 dropping one gait |
 | [stage-32](stage-32.md) | The `Reload` key reading the ini while the game runs | Not run |
+| [stage-33](stage-33.md) | `PHC_SetSuspended` from a test caller, with two owners and the toggle | Passed on the horse. A backward walk from standing after a resume wasn't run, only one resumed with S held |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

@@ -30,7 +30,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.2.0";
+constexpr const char* kVersion = "1.3.0";
 
 // A code signature with ?? for bytes that vary, and the target's distance from its first byte, which must be literal.
 // tools/check_lookups.py runs the same lookups on saved exes, so change both together.
@@ -185,6 +185,14 @@ uintptr_t g_stickSite = 0;
 uintptr_t g_keyCheck = 0;
 uintptr_t g_conditionTableCall = 0;
 std::atomic<bool> g_enabled{true};
+// The number of owners in g_suspendOwners. RidingGroundMount reads it without g_suspendLock.
+std::atomic<int> g_suspendCount{0};
+// Names of the mods holding the mod off through PHC_SetSuspended, guarded by g_suspendLock. An empty string is a free
+// entry.
+constexpr size_t kMaxSuspendOwners = 16;
+constexpr size_t kSuspendOwnerSize = 32;
+char g_suspendOwners[kMaxSuspendOwners][kSuspendOwnerSize] = {};
+SRWLOCK g_suspendLock = SRWLOCK_INIT;
 // The virtual-key code that toggles the mod, set by LoadSettings before ModThread's key loop starts.
 int g_toggleKey = VK_F5;
 int g_reloadKey = VK_END;
@@ -582,7 +590,8 @@ bool RodeoActive() {
 }
 
 bool RidingGroundMount(const Ride& ride) {
-    return g_enabled.load() && ride.mounted && ride.mount != 0 && ride.mount == g_groundMount.load() && !RodeoActive();
+    return g_enabled.load() && g_suspendCount.load() == 0 && ride.mounted && ride.mount != 0 &&
+           ride.mount == g_groundMount.load() && !RodeoActive();
 }
 
 // Return the milliseconds stickX has steered to one side, restarting when it starts steering or changes direction.
@@ -1465,6 +1474,33 @@ DWORD WINAPI ModThread(void* param) {
 }
 
 }  // namespace
+
+// Add owner to the mods holding this mod off when suspended is non-zero, or remove it when zero. The mod stays off while
+// any owner remains, and g_enabled is left alone. Can be called from any thread, and repeating a call changes nothing.
+extern "C" __declspec(dllexport) void PHC_SetSuspended(const char* owner, int32_t suspended) {
+    if (!owner || !*owner) return;
+    AcquireSRWLockExclusive(&g_suspendLock);
+    int found = -1, empty = -1;
+    for (int i = 0; i < static_cast<int>(kMaxSuspendOwners); ++i) {
+        if (!g_suspendOwners[i][0]) {
+            if (empty < 0) empty = i;
+        } else if (strncmp(g_suspendOwners[i], owner, kSuspendOwnerSize - 1) == 0) {
+            found = i;
+        }
+    }
+    if (suspended && found < 0 && empty >= 0) {
+        strncpy_s(g_suspendOwners[empty], owner, _TRUNCATE);
+        ++g_suspendCount;
+        Log("suspended by %s (%d holding)", g_suspendOwners[empty], g_suspendCount.load());
+    } else if (suspended && found < 0) {
+        Log("suspend by %.31s ignored: %zu mods already holding", owner, kMaxSuspendOwners);
+    } else if (!suspended && found >= 0) {
+        Log("resumed by %s (%d holding)", g_suspendOwners[found], g_suspendCount.load() - 1);
+        g_suspendOwners[found][0] = '\0';
+        --g_suspendCount;
+    }
+    ReleaseSRWLockExclusive(&g_suspendLock);
+}
 
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {

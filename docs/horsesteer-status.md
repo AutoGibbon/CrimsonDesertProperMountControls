@@ -5,7 +5,7 @@ Where the land mount mod stands and what to do next. Requirements are in [discov
 
 ## Status
 
-`src/HorseSteer` (v1.2.0, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
+`src/HorseSteer` (v1.3.0, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
 and S alone walks the mount backward, on the horse and the 12 other mounts reached, with no setup. On the wagon, S
 reverses it through the game's brake key, and A or D steer as in the game. Tapping S with W held, the brake key or
 back on the stick slows any of them. The mod pauses during the taming minigame. `CameraDetached` and `TapBrake` under
@@ -21,8 +21,9 @@ and it's the only build in `KNOWN` in `tools/check_lookups.py`.
 Work is on `main`. v1.0.0 is the first Nexus release, as Proper Horse Controls: the zip from `tools/pack.py`,
 with the page text in `mod_page/description.bbcode`. v1.1.0 adds the slowdown. It's tagged `1.1.0` and packed as
 `build/ProperHorseControls-1.1.0.zip`, and is on Nexus. v1.2.0 adds `StickDeadzone`, the feature flags and `Reload`. It's
-tagged `1.2.0` and packed as `build/ProperHorseControls-1.2.0.zip`, and isn't on Nexus yet.
-`DMM\mods\ProperHorseControls.asi` matches the source. The old
+tagged `1.2.0` and packed as `build/ProperHorseControls-1.2.0.zip`. v1.3.0 adds `PHC_SetSuspended`. It's tagged `1.3.0`
+and packed as `build/ProperHorseControls-1.3.0.zip`, and is on Nexus.
+`DMM\mods\ProperHorseControls.asi` is the stage 33 build, which differs from v1.3.0 only in `kVersion`. The old
 `HorseSteer.*` files are still in `DMM\mods` and `bin64`, so `HorseSteer` must stay off in DMM to avoid loading two
 copies.
 
@@ -30,7 +31,7 @@ DMM copies the zip's ini to `bin64` only when there's none, and keeps an existin
 missing setting at startup, so a release that adds settings needs no player steps. Check settings in
 `bin64\ProperHorseControls.ini`.
 
-**Next:** upload v1.2.0 to Nexus, then player reports and the next game update. After an update, run `tools/check_lookups.py` on the new exe.
+**Next:** player reports and the next game update. After an update, run `tools/check_lookups.py` on the new exe.
 
 ## Slowing a mount with S
 
@@ -75,6 +76,11 @@ stages 21 to 29.
 - **Stage 31's one odd slowdown:** a tap from 12.0 dropped two gaits, because the chart passed through `C2B2` and reset the
   count in `UpdateBrakeGap`. The horse was already slow, and the tester suspects a collision. Left as is unless it happens
   on open ground.
+
+## Added in v1.3.0
+
+- **`PHC_SetSuspended`:** an export that lets another mod turn this one off while it holds it, per owner, documented in
+  the README and on the mod page. No mod calls it yet. Passed [stage 33](horsesteer-tests/stage-33.md) on the horse.
 
 ## Release work
 

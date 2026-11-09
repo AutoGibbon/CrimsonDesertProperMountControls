@@ -1,3 +1,6 @@
+Version 1.3.0
+Added a tiny API which other mod authors can call to suspend the features of ProperHorseControls whenever they need to.
+
 Version 1.2.0
 Controller reverse fixed! Little bit of stick wobble no more make horsie spin forever. New StickDeadzone setting if you want more or less of that.
 Don't want horsie go where horsie look, or don't want tap to slow down? Now you can turn either one off in the ini.
