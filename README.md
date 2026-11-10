@@ -23,6 +23,8 @@ actual horse (I have never ridden a horse IRL but this feels like a good way to 
 - No change taming minigame (even though I could have left it and then with this mod you'd have been able to instantly
   win by holding one button).
 
+**\*Note:** Get tighter turns on horsie by letting go of W.
+
 ## Controls
 
 - Proper horse controls
@@ -48,6 +50,15 @@ walking backwards, wagon S reverse and back on stick to slow down.
 **`[Features] TapBrake`**
 Tap S, brake or back on stick to slow down. Default 1, set 0 to turn it off. If CameraDetached is off, tap S (with W
 held) and brake still work, but back on stick is just the game's normal go that way.
+
+**`[Steering] KeyRampMs`**
+How long A and D take to steer all the way, 0 to 500 ms. Default 300. Horsie too slow to turn and you keep hitting
+trees? Go lower. 0 is full steer instantly. Controller not affected, stick already smooth.
+
+**`[Steering] LowSpeed, LowSpeedBias, HighSpeed, HighSpeedBias`**
+How hard W+A/D turns horsie. Bias 0 is straight ahead, 1 is straight sideways, but it tops out at 0.94 so horsie still
+goes somewhere. LowSpeedBias is used at LowSpeed m/s and below, HighSpeedBias at HighSpeed and above, and it blends in
+between. Defaults 2.2, 0.89, 4.8, 0.61. Want to carve tighter at a gallop? Raise HighSpeedBias. Works on controller too.
 
 **`[Keys] Toggle`**
 Key to turn the mod on/off. Default F5. F1-F24, A-Z, 0-9, Numpad0-Numpad9, Insert, Delete, Home, End, PageUp, PageDown,

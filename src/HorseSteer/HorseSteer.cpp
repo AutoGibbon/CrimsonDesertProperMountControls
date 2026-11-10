@@ -1,6 +1,6 @@
 // Horse-relative riding controls: on ground mounts, replaces the camera direction vectors in
 // ClientInputActorComponent's per-frame update with the mount's, so move input is resolved against the mount's facing.
-// Also widens and ramps in forward steering angles, and removes backward input, which leaves S with a steering input as
+// Also tightens forward steering, ramping it in for keys, and removes backward input, which leaves S with a steering input as
 // a pivot. S also walks the mount backward from a near stop, or on mounts with a built-in reverse, acts as the game's
 // brake key. Tapping S with W held slows the mount by a gait. All of this stops while the taming minigame runs, because
 // it needs the game's own input directions.
@@ -30,7 +30,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.3.0";
+constexpr const char* kVersion = "1.3.1";
 
 // A code signature with ?? for bytes that vary, and the target's distance from its first byte, which must be literal.
 // tools/check_lookups.py runs the same lookups on saved exes, so change both together.
@@ -84,12 +84,13 @@ constexpr uint32_t kInput_MoveAngleRelative = 0x8C;
 constexpr uint32_t kInput_CameraForward = 0x154;
 constexpr uint32_t kInput_CameraRight = 0x160;
 
-// A land mount's package, its backward walk speed in m/s, which LoadSettings can replace from ProperHorseControls.ini,
-// and whether S reverses it with the game's brake key instead of the backward walk.
+// A land mount's package, its default backward walk speed in m/s, whether S reverses it with the game's brake key instead
+// of the backward walk, and the backward walk speed in use, which LoadSettings sets from ProperHorseControls.ini.
 struct GroundMount {
     const char* package;
-    float backwardSpeed;
+    float defaultBackwardSpeed;
     bool brakeReverse = false;
+    float backwardSpeed = defaultBackwardSpeed;
 };
 
 // Water mounts, the dragon and machines are left out. The elephant's, the wagon's and other wolf packages' speeds are
@@ -104,13 +105,15 @@ GroundMount g_groundMounts[] = {
     {"CD_M0003_CucuBird", 1.0f},       {"CD_R0012_Wagon_0001", 1.0f, true},
 };
 
-// Forward steering multiplies W+A's 45 degree stick angle by these, blending between the two speeds in m/s.
-constexpr float kTightSteerFactor = 80.0f / 45.0f;
-constexpr float kWideSteerFactor = 55.0f / 45.0f;
-constexpr float kTightSteerSpeed = 2.5f;
-constexpr float kWideSteerSpeed = 5.0f;
+// The widest angle TightenSteering turns the stick to, in radians, which keeps some forward input at every bias.
 constexpr float kMaxSteerAngle = 85.0f / 57.29578f;
-constexpr float kSteerRampMs = 300.0f;
+// The highest LowSpeed and HighSpeed accepted from the ini, in m/s.
+constexpr float kSteerSpeedMax = 20.0f;
+constexpr float kKeyRampMsMax = 500.0f;
+// The shortest steering ramp below kStandingSpeed m/s, whatever KeyRampMs is, because W with A or D pressed together
+// from standing with a shorter ramp can stick the mount turning on the spot.
+constexpr float kStandingRampMs = 100.0f;
+constexpr float kStandingSpeed = 0.2f;
 // A raw stick below this Y counts as backward input. Above it, a negative Y is cleared so that it steers like A or D.
 constexpr float kBackwardStickY = -0.5f;
 // Converts a speed in m/s to the rate added to the position, because every mount tested moves at about twice its rate.
@@ -210,7 +213,15 @@ std::atomic<bool> g_backwardSteerInvert{true};
 // Share of the angle from straight back to straight sideways, 0 to 1, within which OnStickRead treats an analog stick as
 // straight back, because the game turns a mount at its full rate for any non-zero sideways input.
 std::atomic<float> g_reverseDeadzone{0.30f};
-// Whether move input is relative to the mount, with widened steering, the backward walk and the wagon's reverse.
+// Milliseconds, 0 to kKeyRampMsMax, over which TightenSteering's angle builds up from straight ahead for keys.
+std::atomic<float> g_keyRampMs{300.0f};
+// TightenSteering's bias at g_lowSpeed m/s and below, blending to g_highSpeedBias at g_highSpeed and above. A bias is
+// W+A's angle from straight ahead as a share of 90 degrees.
+std::atomic<float> g_lowSpeed{2.2f};
+std::atomic<float> g_lowSpeedBias{0.89f};
+std::atomic<float> g_highSpeed{4.8f};
+std::atomic<float> g_highSpeedBias{0.61f};
+// Whether move input is relative to the mount, with tightened steering, the backward walk and the wagon's reverse.
 std::atomic<bool> g_cameraDetached{true};
 // Whether UpdateBrakeGap can slow the mount.
 std::atomic<bool> g_tapBrake{true};
@@ -495,18 +506,13 @@ int ParseKeyName(const std::wstring& name) {
     return 0;
 }
 
-// Replace the backward speeds, feature flags, reverse steering invert, stick deadzone, toggle key and reload key with
-// any values in the ini at path, write each setting it lacks with its default, so that an ini from an earlier version
-// gains new settings, and log what's in use.
+// Replace the backward speeds, feature flags, key steering ramp, steering bias, reverse steering invert, stick deadzone,
+// toggle key and reload key with any values in the ini at path, and log what's in use. A setting the ini lacks is reset
+// to its default and written with it, so that an ini from an earlier version gains new settings.
 void LoadSettings(const std::wstring& path) {
     wchar_t text[32];
     const auto readText = [&](const wchar_t* section, const wchar_t* key) {
         return GetPrivateProfileStringW(section, key, L"", text, 32, path.c_str()) != 0;
-    };
-    const auto read = [&](const wchar_t* section, const wchar_t* key, float& value, float low, float high) {
-        if (!readText(section, key)) return false;
-        value = std::clamp(wcstof(text, nullptr), low, high);
-        return true;
     };
     int added = 0;
     bool writeFailed = false;
@@ -519,40 +525,40 @@ void LoadSettings(const std::wstring& path) {
         }
     };
     int found = 0;
-    const auto readFeature = [&](const wchar_t* key, std::atomic<bool>& flag) {
-        if (readText(L"Features", key)) {
-            flag = wcstol(text, nullptr, 10) != 0;
+    // Return the value at section and key clamped to low and high, or fallback, which is written, if the key is missing.
+    const auto readFloat = [&](const wchar_t* section, const wchar_t* key, float low, float high,
+                               const wchar_t* fallback) {
+        if (readText(section, key)) {
             ++found;
-        } else {
-            addMissing(L"Features", key, flag.load() ? L"1" : L"0");
+            return std::clamp(wcstof(text, nullptr), low, high);
         }
+        addMissing(section, key, fallback);
+        return wcstof(fallback, nullptr);
     };
-    readFeature(L"CameraDetached", g_cameraDetached);
-    readFeature(L"TapBrake", g_tapBrake);
+    const auto readFlag = [&](const wchar_t* section, const wchar_t* key, bool fallback) {
+        if (readText(section, key)) {
+            ++found;
+            return wcstol(text, nullptr, 10) != 0;
+        }
+        addMissing(section, key, fallback ? L"1" : L"0");
+        return fallback;
+    };
+    g_cameraDetached = readFlag(L"Features", L"CameraDetached", true);
+    g_tapBrake = readFlag(L"Features", L"TapBrake", true);
     for (GroundMount& mount : g_groundMounts) {
         const std::string name(mount.package);
         const std::wstring key(name.begin(), name.end());
-        if (read(L"BackwardSpeed", key.c_str(), mount.backwardSpeed, kBackwardSpeedMin, kBackwardSpeedMax)) {
-            ++found;
-        } else {
-            wchar_t value[16];
-            swprintf(value, 16, L"%.1f", mount.backwardSpeed);
-            addMissing(L"BackwardSpeed", key.c_str(), value);
-        }
+        wchar_t fallback[16];
+        swprintf(fallback, 16, L"%.1f", mount.defaultBackwardSpeed);
+        mount.backwardSpeed = readFloat(L"BackwardSpeed", key.c_str(), kBackwardSpeedMin, kBackwardSpeedMax, fallback);
     }
-    if (readText(L"Reverse", L"InvertSteer")) {
-        g_backwardSteerInvert = wcstol(text, nullptr, 10) != 0;
-        ++found;
-    } else {
-        addMissing(L"Reverse", L"InvertSteer", g_backwardSteerInvert.load() ? L"1" : L"0");
-    }
-    float deadzone = g_reverseDeadzone.load();
-    if (read(L"Reverse", L"StickDeadzone", deadzone, 0.0f, 1.0f)) {
-        g_reverseDeadzone = deadzone;
-        ++found;
-    } else {
-        addMissing(L"Reverse", L"StickDeadzone", L"0.30");
-    }
+    g_backwardSteerInvert = readFlag(L"Reverse", L"InvertSteer", true);
+    g_reverseDeadzone = readFloat(L"Reverse", L"StickDeadzone", 0.0f, 1.0f, L"0.30");
+    g_keyRampMs = readFloat(L"Steering", L"KeyRampMs", 0.0f, kKeyRampMsMax, L"300");
+    g_lowSpeed = readFloat(L"Steering", L"LowSpeed", 0.0f, kSteerSpeedMax, L"2.2");
+    g_lowSpeedBias = readFloat(L"Steering", L"LowSpeedBias", 0.0f, 1.0f, L"0.89");
+    g_highSpeed = readFloat(L"Steering", L"HighSpeed", 0.0f, kSteerSpeedMax, L"4.8");
+    g_highSpeedBias = readFloat(L"Steering", L"HighSpeedBias", 0.0f, 1.0f, L"0.61");
     const auto readKey = [&](const wchar_t* key, const wchar_t* defaultName, int defaultVk, int& vk) {
         vk = defaultVk;
         std::wstring name = defaultName;
@@ -572,10 +578,11 @@ void LoadSettings(const std::wstring& path) {
     const std::wstring toggleName = readKey(L"Toggle", L"F5", VK_F5, g_toggleKey);
     const std::wstring reloadName = readKey(L"Reload", L"End", VK_END, g_reloadKey);
     if (!readText(L"Debug", L"Logging")) addMissing(L"Debug", L"Logging", L"0");
-    Log("ini: %d values read, %d added, camera detached %d, tap brake %d, invert %d, deadzone %.2f, toggle key %ls, "
-        "reload key %ls",
-        found, added, g_cameraDetached.load() ? 1 : 0, g_tapBrake.load() ? 1 : 0, g_backwardSteerInvert.load() ? 1 : 0,
-        g_reverseDeadzone.load(), toggleName.c_str(), reloadName.c_str());
+    Log("ini: %d values read, %d added, camera detached %d, tap brake %d, key ramp %.0fms, steer bias %.2f at %.1f m/s "
+        "to %.2f at %.1f m/s, invert %d, deadzone %.2f, toggle key %ls, reload key %ls",
+        found, added, g_cameraDetached.load() ? 1 : 0, g_tapBrake.load() ? 1 : 0, g_keyRampMs.load(),
+        g_lowSpeedBias.load(), g_lowSpeed.load(), g_highSpeedBias.load(), g_highSpeed.load(),
+        g_backwardSteerInvert.load() ? 1 : 0, g_reverseDeadzone.load(), toggleName.c_str(), reloadName.c_str());
 }
 
 // Return whether the taming minigame's UI was updated within kRodeoTimeoutMs.
@@ -622,11 +629,16 @@ void LogStickKind(float x, float y, bool digital) {
     }
 }
 
-// Steer a forward stick vector further from straight ahead, by more at low speed, scaling the angle by ramp and keeping
-// its magnitude.
-void WidenSteering(float& x, float& y, float speed, float ramp) {
-    const float t = std::clamp((speed - kTightSteerSpeed) / (kWideSteerSpeed - kTightSteerSpeed), 0.0f, 1.0f);
-    const float factor = kTightSteerFactor + (kWideSteerFactor - kTightSteerFactor) * t;
+// Turn a forward stick vector further from straight ahead, keeping its magnitude, so that the mount turns tighter: the
+// angle is multiplied by twice g_lowSpeedBias at g_lowSpeed and below, blending to twice g_highSpeedBias at g_highSpeed
+// and above, capped at kMaxSteerAngle, then scaled by ramp. A ramp below 1 / (2 * bias) steers less than the unchanged
+// stick.
+void TightenSteering(float& x, float& y, float speed, float ramp) {
+    const float low = g_lowSpeed.load(), span = g_highSpeed.load() - low;
+    // A HighSpeed at or below LowSpeed switches between the biases at LowSpeed.
+    const float t = span > 0.0f ? std::clamp((speed - low) / span, 0.0f, 1.0f) : speed > low ? 1.0f : 0.0f;
+    const float lowBias = g_lowSpeedBias.load();
+    const float factor = 2.0f * (lowBias + (g_highSpeedBias.load() - lowBias) * t);
     const float magnitude = std::hypot(x, y);
     const float angle = std::min(std::atan2(std::fabs(x), y) * factor, kMaxSteerAngle) * ramp;
     x = std::copysign(magnitude * std::sin(angle), x);
@@ -865,10 +877,10 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
 }
 
 // Adjust the raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
-// and widen forward steering. S alone starts the backward walk, and A or D during it steers. On g_brakeMount, S brakes
+// and tighten forward steering. S alone starts the backward walk, and A or D during it steers. On g_brakeMount, S brakes
 // instead, which the chart takes as reverse, and A or D pass through as they do with the brake key. In both reverses,
-// g_backwardSteerInvert swaps A and D. Forward steering ramps in only for digital input, as an analog stick already moves
-// gradually. With g_cameraDetached off, the only edit is the zeroed stick of a UpdateBrakeGap slowdown, which needs
+// g_backwardSteerInvert swaps A and D. Forward steering ramps in over g_keyRampMs, or at least kStandingRampMs from
+// standing, only for digital input, as an analog stick already moves gradually. With g_cameraDetached off, the only edit is the zeroed stick of a UpdateBrakeGap slowdown, which needs
 // g_tapBrake.
 void OnStickRead(SafetyHookContext& ctx) {
     const Ride ride = ResolveRide();
@@ -937,8 +949,11 @@ void OnStickRead(SafetyHookContext& ctx) {
     } else if (stick[1] < 0.0f) {
         stick[1] = 0.0f;
     } else if (stick[1] > 0.0f && steering) {
-        const float ramp = digital ? SteerRamp(heldMs, kSteerRampMs) : 1.0f;
-        WidenSteering(stick[0], stick[1], g_mountSpeed.load(), ramp);
+        const float speed = g_mountSpeed.load();
+        const float rampMs =
+            speed < kStandingSpeed ? std::max(g_keyRampMs.load(), kStandingRampMs) : g_keyRampMs.load();
+        const float ramp = digital ? SteerRamp(heldMs, rampMs) : 1.0f;
+        TightenSteering(stick[0], stick[1], speed, ramp);
     } else {
         return;
     }

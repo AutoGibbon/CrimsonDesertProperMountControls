@@ -28,7 +28,7 @@ From stage 23, `[BrakeTest]`, Insert, the CSV's `marker` column and the log's `m
 
 From stage 24, the log adds `brake key press` lines, and `brake gap start` adds `source`.
 
-From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera detached` and `tap brake`. From stage 32, it adds `reload key`, and the log adds a `reloading settings` line before each `ini` line after the first. From stage 33, the log adds `suspended by` and `resumed by` lines with the owner and the number of owners holding.
+From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera detached` and `tap brake`. From stage 32, it adds `reload key`, and the log adds a `reloading settings` line before each `ini` line after the first. From stage 33, the log adds `suspended by` and `resumed by` lines with the owner and the number of owners holding. From stage 34, the `ini` line adds `key ramp`.
 
 ## Tests
 
@@ -84,4 +84,7 @@ From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera de
 | [stage-31](stage-31.md) | `CameraDetached` and `TapBrake` feature flags in each new combination | Passed on the horse. 23 slowdowns with camera-relative input, 22 dropping one gait |
 | [stage-32](stage-32.md) | The `Reload` key reading the ini while the game runs | Not run |
 | [stage-33](stage-33.md) | `PHC_SetSuspended` from a test caller, with two owners and the toggle | Passed on the horse. A backward walk from standing after a resume wasn't run, only one resumed with S held |
+| [stage-34](stage-34.md) | `KeyRampMs` at 0 and 50 ms: standing W+A starts and gallop steering | Response as expected. At 0, 2 of 3 standing starts stuck turning on the spot in `9884`. At 50, 1 of 7 same-row starts did, and 3 of 4 with A or D a row before W, which the tester accepts |
+| [stage-35](stage-35.md) | A 100 ms minimum ramp from standing, with `KeyRampMs=0` | Passed on the horse. 0 of 11 same-row starts with W already read pivoted. The 3 pivots had A or D pressed first on purpose |
+| [stage-36](stage-36.md) | Steering bias settings at the defaults, 0 and 1, changed with Reload | Passed on the horse. Bias 0 didn't turn, bias 1 turned at 75°/s at a gallop against the defaults' 54°/s, and steering faded out between the speeds. A key deleted before a reload kept its old value, fixed and passed on re-run. `HighSpeed` below `LowSpeed` and a gamepad weren't run |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

@@ -5,7 +5,7 @@ Where the land mount mod stands and what to do next. Requirements are in [discov
 
 ## Status
 
-`src/HorseSteer` (v1.3.0, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
+`src/HorseSteer` (v1.3.1, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
 and S alone walks the mount backward, on the horse and the 12 other mounts reached, with no setup. On the wagon, S
 reverses it through the game's brake key, and A or D steer as in the game. Tapping S with W held, the brake key or
 back on the stick slows any of them. The mod pauses during the taming minigame. `CameraDetached` and `TapBrake` under
@@ -22,8 +22,10 @@ Work is on `main`. v1.0.0 is the first Nexus release, as Proper Horse Controls: 
 with the page text in `mod_page/description.bbcode`. v1.1.0 adds the slowdown. It's tagged `1.1.0` and packed as
 `build/ProperHorseControls-1.1.0.zip`, and is on Nexus. v1.2.0 adds `StickDeadzone`, the feature flags and `Reload`. It's
 tagged `1.2.0` and packed as `build/ProperHorseControls-1.2.0.zip`. v1.3.0 adds `PHC_SetSuspended`. It's tagged `1.3.0`
-and packed as `build/ProperHorseControls-1.3.0.zip`, and is on Nexus.
-`DMM\mods\ProperHorseControls.asi` is the stage 33 build, which differs from v1.3.0 only in `kVersion`. The old
+and packed as `build/ProperHorseControls-1.3.0.zip`, and is on Nexus. v1.3.1 adds `KeyRampMs` and the steering bias settings. It's
+committed with the changelog, README and mod page written, but not tagged, packed or uploaded.
+`DMM\mods\ProperHorseControls.asi` is the stage 36 re-run build, which differs from v1.3.1 in `kVersion` and the default
+`LowSpeed` and `HighSpeed`. The old
 `HorseSteer.*` files are still in `DMM\mods` and `bin64`, so `HorseSteer` must stay off in DMM to avoid loading two
 copies.
 
@@ -31,7 +33,8 @@ DMM copies the zip's ini to `bin64` only when there's none, and keeps an existin
 missing setting at startup, so a release that adds settings needs no player steps. Check settings in
 `bin64\ProperHorseControls.ini`.
 
-**Next:** player reports and the next game update. After an update, run `tools/check_lookups.py` on the new exe.
+**Next:** run `tools/pack.py`, tag `1.3.1` and upload. Then player reports and the
+next game update. After an update, run `tools/check_lookups.py` on the new exe.
 
 ## Slowing a mount with S
 
@@ -81,6 +84,22 @@ stages 21 to 29.
 
 - **`PHC_SetSuspended`:** an export that lets another mod turn this one off while it holds it, per owner, documented in
   the README and on the mod page. No mod calls it yet. Passed [stage 33](horsesteer-tests/stage-33.md) on the horse.
+
+## Added in v1.3.1
+
+- **`KeyRampMs`:** under `[Steering]`, 0 to 500, default 300, the ramp that was `kSteerRampMs` since v1.0.0. A player
+  reported keyboard steering slower in 1.3.0 than 1.1.0. Their logs (`scratch/probe-runs/player-report-1110/`) show the
+  300 ms ramp working as designed, and the steering code is identical across those versions, so there's no regression.
+- **Standing floor:** below `kStandingSpeed` (0.2 m/s), the ramp is at least `kStandingRampMs` (100 ms), so that a low
+  `KeyRampMs` doesn't stick the horse turning on the spot. Passed [stage 35](horsesteer-tests/stage-35.md) on the
+  horse at `KeyRampMs=0`. Another mount wasn't tested.
+- **Steering bias:** `LowSpeed`, `LowSpeedBias`, `HighSpeed` and `HighSpeedBias` under `[Steering]` replace
+  `TightenSteering`'s constants. A bias is W+A's angle as a share of 90°, still capped at 85° (0.94). Defaults 2.2, 0.89,
+  4.8 and 0.61: the earlier angles, with the blend moved from 2.5–5.0 m/s by the tester after
+  [stage 36](horsesteer-tests/stage-36.md), which passed on the horse. `HighSpeed` at or below `LowSpeed` switches at
+  `LowSpeed`, untested.
+- **Reload resets missing keys:** a setting deleted from the ini now takes its default on Reload, where before the file
+  got the default but the old value stayed in use. Passed in stage 36.
 
 ## Release work
 

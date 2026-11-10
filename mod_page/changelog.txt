@@ -1,3 +1,8 @@
+Version 1.3.1
+Expose [Steering]KeyRampMs to .ini configuration. This was an internal tuned figure since v1.0.0, set at 300ms, which aimed to make steering feel smoother. Some users may not want smoother steering so making it tunable to taste.
+Expose [Steering]LowSpeed, LowSpeedBias, HighSpeed and HighSpeedBias too. These set how hard W+A/D turns horsie at low and high speed, and were also internal figures since v1.0.0. The blend from low to high now starts a touch earlier, at 2.2 m/s instead of 2.5, and ends at 4.8 instead of 5.0.
+Fixed: delete a setting from the ini and press End, and it now goes back to default straight away instead of keeping the old value until restart.
+
 Version 1.3.0
 Added a tiny API which other mod authors can call to suspend the features of ProperHorseControls whenever they need to.
 

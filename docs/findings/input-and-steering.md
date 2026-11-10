@@ -44,14 +44,18 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
 - **A or D alone:** turns at 60–66°/s from standing and 83–90°/s at 4 m/s.
 - **Turn rate and stick angle (stage 3, `scratch/probe-runs/stage3/`):** the rate follows the angle and levels off near 60°/s. At
   under 2.5 m/s, 45° gives about 31°/s and 80° about 57°/s. At 5 m/s and up, 45° gives about 43–50°/s and 55° about 53–59°/s. It also
-  follows below 45°: with `kSteerRampMs` at 300, at 2.5 m/s and up the rate is about 16°/s at 0.1 s, 36°/s at 0.2 s and 58°/s at
+  follows below 45°: with `KeyRampMs` at 300, at 2.5 m/s and up the rate is about 16°/s at 0.1 s, 36°/s at 0.2 s and 58°/s at
   0.3 s after a steer press (stage 4, `scratch/probe-runs/stage4/`).
 - **Stuck pivot (stage 3):** at the 80° low-speed angle, pressing W and A or D at the same moment can leave the horse turning at
   about 1 m/s or less for as long as the keys are held. Pressing either key first sets off normally, including A or D first, so a
   steep angle alone isn't the cause. The chart cause is untraced. The steering ramp prevents it: all 7 simultaneous starts logged in
-  stage 4 reached walking speed within 2 s.
-- **Steering tuning:** stage 4 passed in game, and the tester rated `kSteerRampMs`, `kTightSteerFactor` and `kWideSteerFactor`
-  about right, so leave them as they are.
+  stage 4 reached walking speed within 2 s. With no ramp, 2 of 3 starts pivoted in stage 34, though the raw stick already
+  held W. A 100 ms ramp below 0.2 m/s (`kStandingRampMs`) stopped all 11 such starts in stage 35. A or D reaching the game
+  first still gives the game's own turn on the spot.
+- **Steering tuning:** stage 4 passed in game, and the tester rated a 300 ms `KeyRampMs` and the 80° and 55° angles about
+  right. v1.3.1 made the angles `LowSpeedBias` 0.89 and `HighSpeedBias` 0.61 (W+A's angle as a share of 90°), with the
+  blend moved from 2.5–5.0 m/s to `LowSpeed` 2.2 and `HighSpeed` 4.8. Bias 0, 1 and a fade between were checked in
+  [stage 36](../horsesteer-tests/stage-36.md). The 85° cap's reason wasn't recorded; it keeps some forward input.
 
 - **Raw keyboard values (stage 14 to 15):** the raw stick at `+0x48` reads 0 or ±1 on each axis, including diagonals, such
   as (−1, 1) for W with A. `DigitalStick` treats those, and equal axes above 0.7, as keys, so the forward ramp skips a stick.
