@@ -91,7 +91,7 @@ every game start, so save them before relaunching.
 ## Compatibility
 
 - Any mod that changes mount or riding inputs will probably conflict.
-- [Crimson Route](https://www.nexusmods.com/crimsondesert/mods/3175) - toggle this mod off when using auto run. Their automatic game inputs need the default camera coupled controls to work properly.
+- [Crimson Route](https://www.nexusmods.com/crimsondesert/mods/3175) - ✅
 - [Horse Tap Brake](https://www.nexusmods.com/crimsondesert/mods/3666) - not compatible. I done eated their mod to help make mine better (with permission).
 
 ## For mod authors
