@@ -28,6 +28,10 @@ From stage 23, `[BrakeTest]`, Insert, the CSV's `marker` column and the log's `m
 
 From stage 24, the log adds `brake key press` lines, and `brake gap start` adds `source`.
 
+From stage 37, the log adds a `lookup physicsSlot` line, a failed lookup reads `FAILED (required)` or
+`not found (optional)`, and setup ends with a `MOD ACTIVE` or `MOD INACTIVE` line. `rider_sync_yaw` and `mount_sync_yaw`
+read 0.00 on every row, in stage 36 too, so don't use them.
+
 From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera detached` and `tap brake`. From stage 32, it adds `reload key`, and the log adds a `reloading settings` line before each `ini` line after the first. From stage 33, the log adds `suspended by` and `resumed by` lines with the owner and the number of owners holding. From stage 34, the `ini` line adds `key ramp`.
 
 ## Tests
@@ -87,4 +91,5 @@ From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera de
 | [stage-34](stage-34.md) | `KeyRampMs` at 0 and 50 ms: standing W+A starts and gallop steering | Response as expected. At 0, 2 of 3 standing starts stuck turning on the spot in `9884`. At 50, 1 of 7 same-row starts did, and 3 of 4 with A or D a row before W, which the tester accepts |
 | [stage-35](stage-35.md) | A 100 ms minimum ramp from standing, with `KeyRampMs=0` | Passed on the horse. 0 of 11 same-row starts with W already read pivoted. The 3 pivots had A or D pressed first on purpose |
 | [stage-36](stage-36.md) | Steering bias settings at the defaults, 0 and 1, changed with Reload | Passed on the horse. Bias 0 didn't turn, bias 1 turned at 75°/s at a gallop against the defaults' 54°/s, and steering faded out between the speeds. A key deleted before a reload kept its old value, fixed and passed on re-run. `HighSpeed` below `LowSpeed` and a gamepad weren't run |
+| [stage-37](stage-37.md) | Game update `0x6AF5D198`: the wildcarded condition count and the `physicsSlot` lookup | Passed on the horse. Steering applied on 1,270 of 1,271 rows, the backward walk and brake gaps worked, and position speed matched velocity |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

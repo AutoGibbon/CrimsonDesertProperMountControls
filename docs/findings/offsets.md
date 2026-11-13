@@ -5,7 +5,8 @@ do is explained in the topic files.
 
 `HorseSteer` finds the addresses below at startup and logs them. If a required lookup fails, it installs no hooks. `tools/check_lookups.py EXE...` runs the same lookups on saved exes and compares them with each build's known addresses in `KNOWN`. Change the tool and the mod together.
 
-The lookups don't cover field offsets, apart from the ones in the signatures (`+0x154`, `+0x160`, `+0x48`), or the rodeo slot number. After a game update, check those by hand. If a lookup fails, check [CrimsonDesertCoop](https://github.com/macauleywilliams96-dotcom/CrimsonDesertCoop)
+The lookups don't cover field offsets, apart from the ones in the signatures (`+0x154`, `+0x160`, `+0x48`, and the
+`+0x68`, `+0x40`, `+0x140` chain), the physics object's offset (`g_physicsSlot`), or the rodeo slot number. After a game update, check those by hand. If a lookup fails, check [CrimsonDesertCoop](https://github.com/macauleywilliams96-dotcom/CrimsonDesertCoop)
 for new offsets, or port them with its `PORTING-3479.md` method using `scratch/exe-baseline/`. To re-derive the camera slot, use
 `docs/ENGINE_CAMERA_RESEARCH.md` from CrimsonDesertTelemetry.
 
@@ -22,6 +23,7 @@ for new offsets, or port them with its `PORTING-3479.md` method using `scratch/e
 | `g_stickSite` | `0xB6D626` | Signature | Input update, right before the raw stick is read from `+0x48` |
 | `g_keyCheck` | `0x3B0750` | Signature, not required | Chart key condition handler, type `0xEA`. `InstallBrakeKey` checks the table slot holds it |
 | `g_conditionTableCall` | `0x3AA79C` | Signature, not required | A call to the chart condition handler table's getter, `0x3AA5C0`, which is Denuvo-mutated. Found in [stage 15](../horsesteer-tests/stage-15.md) |
+| `g_physicsSlot` | `+0x2C0` | 8-aligned 64-bit load after the actor's `+0x68`, `+0x40`, `+0x140` chain, at least 3 times the next | The physics object's offset. `+0x2D0` on `0x6AF5D198` |
 | `g_vtRodeoUi` | `0x5A75218` | RTTI | `UIGamePlayControlRootMiniGameRodeo` vtable; slot 47 runs each frame of the minigame |
 
 ```text

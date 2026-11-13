@@ -5,16 +5,19 @@ Where the land mount mod stands and what to do next. Requirements are in [discov
 
 ## Status
 
-`src/HorseSteer` (v1.3.1, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
+`src/HorseSteer` (v1.3.2, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
 and S alone walks the mount backward, on the horse and the 12 other mounts reached, with no setup. On the wagon, S
 reverses it through the game's brake key, and A or D steer as in the game. Tapping S with W held, the brake key or
 back on the stick slows any of them. The mod pauses during the taming minigame. `CameraDetached` and `TapBrake` under
 `[Features]` turn off the mount-relative controls and the slowdown separately, and `Reload` under `[Keys]`, End by
 default, reads the ini again in game.
 
-It finds its addresses at startup, and every lookup matched on the two game updates since build 26423880, up to PE timestamp
-`0x6AED2E85` (2026-11-06). A copy of that exe is in `scratch/exe-baseline/`,
-and it's the only build in `KNOWN` in `tools/check_lookups.py`.
+It finds its addresses at startup. Every lookup matched on the two game updates since build 26423880, up to PE timestamp
+`0x6AED2E85` (2026-11-06). On `0x6AF5D198` (2026-11-13), `conditionTableCall` failed because the condition type count
+went from `0x286` to `0x28A`, so the count is now a wildcard in the signature; the key slot is unchanged. The same update
+moved the physics object from `+0x2C0` to `+0x2D0`, which no lookup covered, so steering and the backward walk stopped
+working with every lookup passing. `g_physicsSlot` is now looked up. Copies of both exes are in `scratch/exe-baseline/`,
+and both builds are in `KNOWN` in `tools/check_lookups.py`. The fixes passed [stage 37](horsesteer-tests/stage-37.md).
 
 ## Resume here
 
@@ -23,9 +26,9 @@ with the page text in `mod_page/description.bbcode`. v1.1.0 adds the slowdown. I
 `build/ProperHorseControls-1.1.0.zip`, and is on Nexus. v1.2.0 adds `StickDeadzone`, the feature flags and `Reload`. It's
 tagged `1.2.0` and packed as `build/ProperHorseControls-1.2.0.zip`. v1.3.0 adds `PHC_SetSuspended`. It's tagged `1.3.0`
 and packed as `build/ProperHorseControls-1.3.0.zip`, and is on Nexus. v1.3.1 adds `KeyRampMs` and the steering bias settings. It's
-committed with the changelog, README and mod page written, but not tagged, packed or uploaded.
-`DMM\mods\ProperHorseControls.asi` is the stage 36 re-run build, which differs from v1.3.1 in `kVersion` and the default
-`LowSpeed` and `HighSpeed`. The old
+tagged `1.3.1` and packed as `build/ProperHorseControls-1.3.1.zip`. v1.3.2 updates the mod for game update `0x6AF5D198`,
+with the changelog written. `DMM\mods\ProperHorseControls.asi` is the stage 37 build, which differs from v1.3.2 only in
+`kVersion`. The old
 `HorseSteer.*` files are still in `DMM\mods` and `bin64`, so `HorseSteer` must stay off in DMM to avoid loading two
 copies.
 
@@ -33,7 +36,7 @@ DMM copies the zip's ini to `bin64` only when there's none, and keeps an existin
 missing setting at startup, so a release that adds settings needs no player steps. Check settings in
 `bin64\ProperHorseControls.ini`.
 
-**Next:** run `tools/pack.py`, tag `1.3.1` and upload. Then player reports and the
+**Next:** tag `1.3.2` and upload `build/ProperHorseControls-1.3.2.zip`. Then player reports and the
 next game update. After an update, run `tools/check_lookups.py` on the new exe.
 
 ## Slowing a mount with S
@@ -101,6 +104,14 @@ stages 21 to 29.
 - **Reload resets missing keys:** a setting deleted from the ini now takes its default on Reload, where before the file
   got the default but the old value stayed in use. Passed in stage 36.
 
+## Added in v1.3.2
+
+- **Game update `0x6AF5D198`:** the `conditionTableCall` signature's condition count is a wildcard, and the new
+  `LookupPhysicsSlot` finds the physics object's offset, now `+0x2D0`. Passed [stage 37](horsesteer-tests/stage-37.md)
+  on the horse.
+- **Log verdict:** setup ends with `MOD ACTIVE` or `MOD INACTIVE`, and each failed lookup says whether it's required.
+- **Backward walk:** writes the position only when the axis and position it read are finite.
+
 ## Release work
 
 All done for v1.0.0.
@@ -108,8 +119,8 @@ All done for v1.0.0.
 1. **Recovery speed limit:** done, passed [stage 18](horsesteer-tests/stage-18.md).
 2. **`Logging=0`:** done. `tools/pack.py` sets `Logging=0` in the zipped ini, so
    `src/HorseSteer/ProperHorseControls.ini` keeps `Logging=1` for tests.
-3. **Exe baseline:** done. `scratch/exe-baseline/` holds only the current exe (`0x6AED2E85`), and `KNOWN` only its
-   addresses. The 3479 and 26423880 copies were discarded.
+3. **Exe baseline:** done. `scratch/exe-baseline/` holds the current exe (`0x6AF5D198`) and the previous one
+   (`0x6AED2E85`), and `KNOWN` has both builds' addresses. The 3479 and 26423880 copies were discarded.
 4. **Shift+F5, toggle key and reverse steering invert:** done, passed [stage 19](horsesteer-tests/stage-19.md) on the
    horse and wagon. Shift+F5 and `g_flip` are gone, `Toggle` under `[Keys]` sets the toggle key, and `InvertSteer`
    under `[Reverse]` swaps A and D during the backward walk and the wagon's brake reverse, with 1 as the default.

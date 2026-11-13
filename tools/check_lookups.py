@@ -33,7 +33,7 @@ SIGNATURES = {
     ),
     # A call to the chart condition handler table's getter.
     "conditionTableCall": (
-        "E8 ?? ?? ?? ?? 81 FB 86 02 00 00 73 ?? 8D 8B 7D FF FF FF 48 8D 1C CD 00 00 00 00 48 83 3C 03 00",
+        "E8 ?? ?? ?? ?? 81 FB ?? ?? 00 00 73 ?? 8D 8B 7D FF FF FF 48 8D 1C CD 00 00 00 00 48 83 3C 03 00",
         0,
     ),
 }
@@ -42,6 +42,9 @@ SIGNATURES = {
 WORLD_REFERENCE = re.compile(rb"\x48\x8B\x05(....)\x48\x8B\x48\x30", re.DOTALL)
 # The most-referenced global must have at least this many times the references of the next.
 WORLD_MIN_RATIO = 3
+# The actor's chain to its physics object: [[[actor+0x68]+0x40]+0x140]+disp32. Only 8-aligned 64-bit loads count,
+# because an unaligned pointer 0x11 past the physics object is loaded as often.
+PHYSICS_CHAIN = re.compile(rb"\x8B.\x68.\x8B.\x40.\x8B.\x40\x01\x00\x00(.)\x8B.(....)", re.DOTALL)
 
 KNOWN = {
     0x6AED2E85: {  # Steam build of 2026-11-06, passed stage 18
@@ -54,6 +57,19 @@ KNOWN = {
         "stickSite": 0xB6DA46,
         "keyCheck": 0x3B0A30,
         "conditionTableCall": 0x3AAA7C,
+        "physicsSlot": 0x2C0,
+    },
+    0x6AF5D198: {  # Steam build of 2026-11-13, not yet tested in game
+        "vtActorManager": 0x59C2760,
+        "vtVehicleComponent": 0x59C2910,
+        "vtRodeoUi": 0x5AF2ED8,
+        "rodeoUiSlot0": 0x122AB80,
+        "worldSystemSlot": 0x72451C0,
+        "hookSite": 0xBA4B46,
+        "stickSite": 0xBA4C46,
+        "keyCheck": 0x3B4090,
+        "conditionTableCall": 0x3AE0CC,
+        "physicsSlot": 0x2D0,
     },
 }
 
@@ -137,6 +153,17 @@ def world_references(image):
     return counts.most_common(2)
 
 
+def physics_loads(image):
+    """Return (physics object offset, load count) pairs, most-loaded first."""
+    counts = collections.Counter()
+    for _, first, last in image.regions(is_exec):
+        for match in PHYSICS_CHAIN.finditer(image.data, first, last):
+            displacement = struct.unpack("<I", match.group(2))[0]
+            if match.group(1)[0] & 0xF8 == 0x48 and displacement % 8 == 0 and displacement < 0x10000:
+                counts[displacement] += 1
+    return counts.most_common(2)
+
+
 def signature_pattern(text):
     parts = [b"." if t == "??" else re.escape(bytes.fromhex(t)) for t in text.split()]
     return re.compile(b"".join(parts), re.DOTALL)
@@ -168,6 +195,11 @@ def check(image, known):
     clear = bool(top) and top[0][1] >= WORLD_MIN_RATIO * runner_up
     detail = f"{top[0][1] if top else 0} references, next {runner_up}"
     report("worldSystemSlot", top[0][0] if clear else None, detail)
+
+    top = physics_loads(image)
+    runner_up = top[1][1] if len(top) > 1 else 0
+    clear = bool(top) and top[0][1] >= WORLD_MIN_RATIO * runner_up
+    report("physicsSlot", top[0][0] if clear else None, f"{top[0][1] if top else 0} loads, next {runner_up}")
 
     for name, (text, distance) in SIGNATURES.items():
         hits = image.find_all(signature_pattern(text), is_exec)

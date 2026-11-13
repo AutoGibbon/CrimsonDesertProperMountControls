@@ -30,7 +30,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.3.1";
+constexpr const char* kVersion = "1.3.2";
 
 // A code signature with ?? for bytes that vary, and the target's distance from its first byte, which must be literal.
 // tools/check_lookups.py runs the same lookups on saved exes, so change both together.
@@ -55,9 +55,9 @@ constexpr Signature kKeyCheckSignature{
     -14};
 constexpr uint8_t kKeyCheckBytes[] = {0x48, 0x83, 0xEC, 0x28, 0x48, 0x8B, 0x02, 0x8B, 0x50, 0x08};
 // A call to the function that returns the chart condition handler table, in the code that checks a condition type is
-// below 0x286 and indexes the table by type - 0x83.
+// below the type count and indexes the table by type - 0x83. The count is a wildcard, because updates add types.
 constexpr Signature kConditionTableCallSignature{
-    "E8 ?? ?? ?? ?? 81 FB 86 02 00 00 73 ?? 8D 8B 7D FF FF FF 48 8D 1C CD 00 00 00 00 48 83 3C 03 00", 0};
+    "E8 ?? ?? ?? ?? 81 FB ?? ?? 00 00 73 ?? 8D 8B 7D FF FF FF 48 8D 1C CD 00 00 00 00 48 83 3C 03 00", 0};
 constexpr size_t kKeyConditionSlot = 0xEA - 0x83;
 constexpr uint32_t kKeyBrakeHash = 0x377B9DB8;
 // The input object's vtable slot that takes a key hash and returns whether the key is held.
@@ -67,6 +67,12 @@ constexpr uint8_t kConditionHolds = 0;
 // mov rax,[rip+x]; mov rcx,[rax+0x30], which loads the WorldSystem global far more often than any other global.
 constexpr const char* kWorldReferenceSignature = "48 8B 05 ?? ?? ?? ?? 48 8B 48 30";
 constexpr int kWorldMinRatio = 3;
+// mov r,[r+0x68]; mov r,[r+0x40]; mov r,[r+0x140]; mov r,[r+disp32]: the actor's chain to its physics object, which
+// LookupPhysicsSlot counts by disp32. An unaligned pointer 0x11 past the physics object is loaded as often, so only
+// 8-aligned 64-bit loads count.
+constexpr const char* kPhysicsChainSignature = "8B ?? 68 ?? 8B ?? 40 ?? 8B ?? 40 01 00 00 ?? 8B ?? ?? ?? 00 00";
+constexpr size_t kPhysicsChainRex = 14;
+constexpr size_t kPhysicsChainDisplacement = 17;
 // Class names in RTTI for the vtables.
 constexpr const char* kClassActorManager = ".?AVClientActorManager@pa@@";
 constexpr const char* kClassVehicleComponent = ".?AVClientVehicleActorComponent@pa@@";
@@ -180,6 +186,8 @@ FILE* g_csv = nullptr;
 uintptr_t g_base = 0;
 // Offsets from g_base, set by RunLookups before the hooks are installed.
 uintptr_t g_worldSystemSlot = 0;
+// The physics object's offset in the object at [[[actor+0x68]+0x40]+0x140].
+uint32_t g_physicsSlot = 0;
 uintptr_t g_vtActorManager = 0;
 uintptr_t g_vtVehicleComponent = 0;
 uintptr_t g_vtRodeoUi = 0;
@@ -348,7 +356,7 @@ uintptr_t PhysicsObject(uintptr_t actor) {
     const uintptr_t components = ReadPtr(actor + 0x68);
     const uintptr_t control = components ? ReadPtr(components + 0x40) : 0;
     const uintptr_t inner = control ? ReadPtr(control + 0x140) : 0;
-    return inner ? ReadPtr(inner + 0x2C0) : 0;
+    return inner ? ReadPtr(inner + g_physicsSlot) : 0;
 }
 
 // Read the Z axis and position of an actor's physics object.
@@ -678,7 +686,8 @@ void UpdateBackwardWalk(const Ride& ride) {
 
     const uintptr_t physics = PhysicsObject(ride.mount);
     Vec3 axisZ{}, position{};
-    if (!g_backwardWanted.load() || !physics || !Read(physics + 0x80, axisZ) || !Read(physics + 0x90, position)) {
+    if (!g_backwardWanted.load() || !physics || !Read(physics + 0x80, axisZ) || !Read(physics + 0x90, position) ||
+        !Finite(axisZ) || !Finite(position)) {
         active = false;
         g_backwardWalking = false;
         return;
@@ -961,13 +970,13 @@ void OnStickRead(SafetyHookContext& ctx) {
 }
 
 // Replace the rodeo UI's per-frame vtable slot with a stub that counts the call and jumps to the original, leaving every
-// register except the flags untouched, so that RodeoActive can tell when the minigame is open.
-void InstallRodeoSwitch() {
+// register except the flags untouched, so that RodeoActive can tell when the minigame is open. Return whether it installed.
+bool InstallRodeoSwitch() {
     const auto vtable = reinterpret_cast<uintptr_t*>(g_base + g_vtRodeoUi);
     auto* stub = static_cast<uint8_t*>(VirtualAlloc(nullptr, 32, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
     if (!stub) {
         LogProblem("rodeo switch: stub allocation failed, so the mod won't pause for the taming minigame");
-        return;
+        return false;
     }
     // lock inc qword ptr [rip+8]; jmp qword ptr [rip+10]; the counter is at +16 and the original address at +24.
     const uint8_t code[] = {0xF0, 0x48, 0xFF, 0x05, 8, 0, 0, 0, 0xFF, 0x25, 10, 0, 0, 0};
@@ -977,12 +986,13 @@ void InstallRodeoSwitch() {
     DWORD oldProtect = 0;
     if (!VirtualProtect(&vtable[kRodeoUiFrameSlot], sizeof(uintptr_t), PAGE_READWRITE, &oldProtect)) {
         LogProblem("rodeo switch: vtable protection failed, so the mod won't pause for the taming minigame");
-        return;
+        return false;
     }
     g_rodeoCalls = reinterpret_cast<volatile uint64_t*>(stub + 16);
     vtable[kRodeoUiFrameSlot] = reinterpret_cast<uintptr_t>(stub);
     VirtualProtect(&vtable[kRodeoUiFrameSlot], sizeof(uintptr_t), oldProtect, &oldProtect);
     Log("rodeo switch installed");
+    return true;
 }
 
 // Log the key check's first bytes if they differ from the file's, which means something patched it at runtime.
@@ -1297,7 +1307,7 @@ std::vector<uintptr_t> FindVtables(const char* className) {
 bool LookupVtable(const char* name, const char* className, uintptr_t& out) {
     const std::vector<uintptr_t> vtables = FindVtables(className);
     if (vtables.size() != 1) {
-        LogProblem("lookup %s FAILED: %zu vtables for %s", name, vtables.size(), className);
+        LogProblem("lookup %s FAILED (required): %zu vtables for %s", name, vtables.size(), className);
         return false;
     }
     out = vtables[0];
@@ -1305,11 +1315,14 @@ bool LookupVtable(const char* name, const char* className, uintptr_t& out) {
     return true;
 }
 
-// Set out to the signature's target and log the result. Return whether the signature has exactly one match.
-bool LookupSignature(const char* name, const Signature& signature, uintptr_t& out) {
+// Set out to the signature's target and log the result, marked as required or optional for the mod to run. Return
+// whether the signature has exactly one match.
+bool LookupSignature(const char* name, const Signature& signature, uintptr_t& out, bool required) {
     const std::vector<uintptr_t> hits = FindAll(ParseSignature(signature.text), SectionKind::Code);
     if (hits.size() != 1) {
-        LogProblem("lookup %s FAILED: %zu signature matches", name, hits.size());
+        LogProblem(required ? "lookup %s FAILED (required): %zu signature matches"
+                            : "lookup %s not found (optional): %zu signature matches",
+                   name, hits.size());
         return false;
     }
     out = hits[0] + signature.distance;
@@ -1337,11 +1350,43 @@ bool LookupWorldSystemSlot() {
         }
     }
     if (top == 0 || top < kWorldMinRatio * next) {
-        LogProblem("lookup worldSystemSlot FAILED: %d references, next %d", top, next);
+        LogProblem("lookup worldSystemSlot FAILED (required): %d references, next %d", top, next);
         return false;
     }
     g_worldSystemSlot = slot;
     Log("lookup worldSystemSlot: exe+0x%llX, %d references, next %d", static_cast<unsigned long long>(slot), top, next);
+    return true;
+}
+
+// Set g_physicsSlot to the 8-aligned offset that 64-bit loads after kPhysicsChainSignature use most, and log the result.
+// Return false unless it has at least kWorldMinRatio times the loads of the next aligned offset.
+bool LookupPhysicsSlot() {
+    std::unordered_map<uint32_t, int> counts;
+    for (const uintptr_t hit : FindAll(ParseSignature(kPhysicsChainSignature), SectionKind::Code)) {
+        uint8_t rex = 0;
+        uint32_t displacement = 0;
+        if (Read(g_base + hit + kPhysicsChainRex, rex) && (rex & 0xF8) == 0x48 &&
+            Read(g_base + hit + kPhysicsChainDisplacement, displacement) && displacement % 8 == 0) {
+            ++counts[displacement];
+        }
+    }
+    uint32_t slot = 0;
+    int top = 0, next = 0;
+    for (const auto& [displacement, count] : counts) {
+        if (count > top) {
+            next = top;
+            top = count;
+            slot = displacement;
+        } else if (count > next) {
+            next = count;
+        }
+    }
+    if (top == 0 || top < kWorldMinRatio * next) {
+        LogProblem("lookup physicsSlot FAILED (required): %d loads, next %d", top, next);
+        return false;
+    }
+    g_physicsSlot = slot;
+    Log("lookup physicsSlot: +0x%X, %d loads, next %d", slot, top, next);
     return true;
 }
 
@@ -1353,32 +1398,42 @@ bool RunLookups() {
     ok &= LookupVtable("vtVehicleComponent", kClassVehicleComponent, g_vtVehicleComponent);
     ok &= LookupVtable("vtRodeoUi", kClassRodeoUi, g_vtRodeoUi);
     ok &= LookupWorldSystemSlot();
-    ok &= LookupSignature("hookSite", kHookSiteSignature, g_hookSite);
-    ok &= LookupSignature("stickSite", kStickSiteSignature, g_stickSite);
-    LookupSignature("keyCheck", kKeyCheckSignature, g_keyCheck);
-    LookupSignature("conditionTableCall", kConditionTableCallSignature, g_conditionTableCall);
+    ok &= LookupPhysicsSlot();
+    ok &= LookupSignature("hookSite", kHookSiteSignature, g_hookSite, true);
+    ok &= LookupSignature("stickSite", kStickSiteSignature, g_stickSite, true);
+    LookupSignature("keyCheck", kKeyCheckSignature, g_keyCheck, false);
+    LookupSignature("conditionTableCall", kConditionTableCallSignature, g_conditionTableCall, false);
     Log("lookups took %llu ms", GetTickCount64() - start);
     return ok;
 }
 
 bool InstallHook() {
     if (!RunLookups()) {
-        LogProblem("a required lookup failed: hooks not installed, mod idle");
+        LogProblem("MOD INACTIVE: a required lookup failed.");
         return false;
     }
     auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + g_hookSite), OnInputUpdate);
     auto stickHook = safetyhook::MidHook::create(reinterpret_cast<void*>(g_base + g_stickSite), OnStickRead);
     if (!hook || !stickHook) {
-        LogProblem("hooks failed to install: mod idle");
+        LogProblem("MOD INACTIVE: hooks failed to install.");
         return false;
     }
     g_hook = std::move(*hook);
     g_stickHook = std::move(*stickHook);
     Log("hooks installed at exe+0x%llX and exe+0x%llX", static_cast<unsigned long long>(g_hookSite),
         static_cast<unsigned long long>(g_stickSite));
-    InstallRodeoSwitch();
+    const bool rodeoSwitch = InstallRodeoSwitch();
     if (g_keyCheck && g_logging) LogKeyCheckBytes();
     InstallBrakeKey();
+    std::string missing;
+    if (!rodeoSwitch) missing += ", taming minigame pause";
+    if (!g_keyCondition) missing += ", brake key";
+    if (missing.empty()) {
+        Log("MOD ACTIVE: all features enabled.");
+    } else {
+        LogProblem("MOD ACTIVE without %s: horse-relative controls work, see the lines above for what's missing",
+                   missing.c_str() + 2);
+    }
     return true;
 }
 
