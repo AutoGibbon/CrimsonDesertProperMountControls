@@ -36,7 +36,7 @@ DMM copies the zip's ini to `bin64` only when there's none, and keeps an existin
 missing setting at startup, so a release that adds settings needs no player steps. Check settings in
 `bin64\ProperHorseControls.ini`.
 
-**Next:** tag `1.3.2` and upload `build/ProperHorseControls-1.3.2.zip`. Then player reports and the
+**Next:** upload `build/ProperHorseControls-1.3.2.zip`. Then player reports and the
 next game update. After an update, run `tools/check_lookups.py` on the new exe.
 
 ## Slowing a mount with S

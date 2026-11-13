@@ -5,7 +5,7 @@ Where each piece of work stands. Keep this page to the table and the game state,
 | Work | State | Next | Detail |
 |---|---|---|---|
 | **Boats** (current focus) | Game files read. No in-game results and no code | Tester reaches a ship and plays it with the mod inactive | [boats/status.md](boats/status.md) |
-| **Land mounts** (`HorseSteer`, published as Proper Horse Controls) | v1.3.0 is on Nexus. v1.3.1 is tagged and packed. v1.3.2 (game update `0x6AF5D198`) passed stage 37 and is packed | Tag v1.3.2 and upload | [horsesteer-status.md](horsesteer-status.md) |
+| **Land mounts** (`HorseSteer`, published as Proper Horse Controls) | v1.3.0 is on Nexus. v1.3.1 is tagged and packed. v1.3.2 (game update `0x6AF5D198`) passed stage 37 and is tagged and packed | Upload v1.3.2 | [horsesteer-status.md](horsesteer-status.md) |
 
 ## Game state
 
