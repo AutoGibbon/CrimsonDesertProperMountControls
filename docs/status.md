@@ -14,6 +14,8 @@ Where each piece of work stands. Keep this page to the table and the game state,
 - **DLC:** `dlc_01` (Charting the Unknown) installed 2026-11-08 in `dlc/dlc_01/`, with the exe unchanged.
 - **Save for tests:** the tester loads save slot 1. It's edited to add mounts other than the horse when a test needs
   them.
-- **After a game update:** run `tools/check_lookups.py` on the new exe.
+- **After a game update:** run `tools/check_lookups.py` on the new exe, and `tools/check_charts.py GAME_DIR CDMW_SRC
+  scratch/out/charts-check` on the game. Lookups can all pass while the charts no longer use the conditions the
+  slowdown and step down answer, which shows in game as braking that flips in and out of slowing or does nothing.
 - **Stale extracts:** `scratch/out/index.tsv`, `scratch/out/charts/` and `scratch/out/loc_eng.json` predate the 2026-11-06
   update and the DLC. Regenerate them with `tools/` before relying on them.

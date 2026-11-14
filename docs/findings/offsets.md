@@ -3,7 +3,7 @@
 Steam build 26423880, PE timestamp `0x6AEA07A6`. All values are offsets from the image base unless shown as a field of a chain. What they
 do is explained in the topic files.
 
-`HorseSteer` finds the addresses below at startup and logs them. If a required lookup fails, it installs no hooks. `tools/check_lookups.py EXE...` runs the same lookups on saved exes and compares them with each build's known addresses in `KNOWN`. Change the tool and the mod together.
+`HorseSteer` finds the addresses below at startup and logs them. If a required lookup fails, it installs no hooks. `tools/check_lookups.py EXE...` runs the same lookups on saved exes and compares them with each build's known addresses in `KNOWN`. Change the tool and the mod together. The chart condition numbers the mod answers (`T10`, `TE`, `T66`) and the charts it relies on are checked by `tools/check_charts.py`, which the mod's `GroundMount::stepDown` list must match.
 
 The lookups don't cover field offsets, apart from the ones in the signatures (`+0x154`, `+0x160`, `+0x48`, and the
 `+0x68`, `+0x40`, `+0x140` chain), the physics object's offset (`g_physicsSlot`), or the rodeo slot number. After a game update, check those by hand. If a lookup fails, check [CrimsonDesertCoop](https://github.com/macauleywilliams96-dotcom/CrimsonDesertCoop)

@@ -38,7 +38,8 @@ missing setting at startup, so a release that adds settings needs no player step
 `bin64\ProperHorseControls.ini`.
 
 **Next:** upload `build/ProperHorseControls-1.4.0.zip`. Then player reports and the
-next game update. After an update, run `tools/check_lookups.py` on the new exe.
+next game update. After an update, run `tools/check_lookups.py` on the new exe and `tools/check_charts.py` on the
+game. The wagon's chart is `UNCHECKED` there, because CDMW can't decode the current one.
 
 **Added in v1.4.0: braking while turning and one-gait drops.** In v1.3.2, braking while turning at a canter or above needed
 the brake key held, and S with A or D didn't slow at all, because the slowdown didn't start while steering. The working
