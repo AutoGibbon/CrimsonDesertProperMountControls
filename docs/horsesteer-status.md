@@ -41,6 +41,11 @@ missing setting at startup, so a release that adds settings needs no player step
 next game update. After an update, run `tools/check_lookups.py` on the new exe and `tools/check_charts.py` on the
 game. The wagon's chart is `UNCHECKED` there, because CDMW can't decode the current one.
 
+**Planned after the next update that causes a regression:** change the startup checks so that any failed check turns
+the whole mod off, instead of running with parts missing. Today only the required lookups do that: `keyCheck`,
+`conditionTableCall`, the slot 77 lookup and the rodeo switch are optional, and their features fall back or drop out,
+such as the zeroed-stick slowdown when slot 77 isn't found.
+
 **Added in v1.4.0: braking while turning and one-gait drops.** In v1.3.2, braking while turning at a canter or above needed
 the brake key held, and S with A or D didn't slow at all, because the slowdown didn't start while steering. The working
 code fixes both, and drops every tested mount one gait per tap. It passed [stage 45](horsesteer-tests/stage-45.md) on
