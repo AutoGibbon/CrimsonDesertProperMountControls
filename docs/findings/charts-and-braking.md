@@ -196,7 +196,7 @@ as is, so steering continues. `key_brake` and drift are untouched.
 - **Chart numbering on `0x6AF5D198`:** `AND`, `OR` and `NOT` are `0x28B`, `0x28C` and `0x28D`, so the interpreter's
   tokens in [offsets.md](offsets.md) are confirmed. Types from about `0x1E3` up moved by 2 or 3, such as `T1E3` to
   `T1E5` and `T27E` to `T281`. `T10`, `TE`, `T66`, `T167`, `TC9` and `key_brake` kept their numbers.
-  `tools/chart_node_branches.py` still decodes the logic tokens with the old numbers.
+  `tools/chart_node_branches.py` and `tools/chart_branches.py` pick the numbering from the chart.
 - **One-gait drops on other mounts:** `T10` gets them into their slowing node, but they still leave it at the node's
   fixed `TC9` speed. Answering that `TC9` as true at the next gait's speed, while the chart is in the slowing node, could
   make them leave one gait down. `TC9` is type `0xC9`, so it goes through the handler table `InstallBrakeKey` patches.

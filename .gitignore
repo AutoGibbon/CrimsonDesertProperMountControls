@@ -1,3 +1,4 @@
 scratch/
 .claude/settings.local.json
 build/
+tools/__pycache__/

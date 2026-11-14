@@ -26,6 +26,9 @@ indices = struct.unpack_from(f"<{ix.count}H", d, ix.offset)
 starts = sorted(set(indices))
 br = span("branchInstanceArray")
 rec = span("branchInstanceArray records (32 bytes)")
+# The AND, OR and NOT tokens. Game update 0x6AF5D198 added 4 condition types and moved them from 0x287 up to 0x28B up,
+# where 0x287 became an ordinary type, so the numbering is taken from whichever set the chart uses.
+LOGIC = 0x28B if any(dw[s] in (0x28B, 0x28C, 0x28D) for s in starts) else 0x287
 
 
 def tok(i):
@@ -41,11 +44,11 @@ def show(t):
     op = t[0]
     if op == 0xEA:
         return names[t[1]] if t[1] < len(names) else "key?"
-    if op == 0x287:
+    if op == LOGIC:
         return "AND"
-    if op == 0x288:
+    if op == LOGIC + 1:
         return "OR"
-    if op == 0x289:
+    if op == LOGIC + 2:
         return "NOT"
     if op == 0xEE:
         return f"SKILL_USABLE({t[1]})"
