@@ -30,7 +30,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.3.2";
+constexpr const char* kVersion = "1.4.0";
 
 // A code signature with ?? for bytes that vary, and the target's distance from its first byte, which must be literal.
 // tools/check_lookups.py runs the same lookups on saved exes, so change both together.
@@ -59,11 +59,30 @@ constexpr uint8_t kKeyCheckBytes[] = {0x48, 0x83, 0xEC, 0x28, 0x48, 0x8B, 0x02, 
 constexpr Signature kConditionTableCallSignature{
     "E8 ?? ?? ?? ?? 81 FB ?? ?? 00 00 73 ?? 8D 8B 7D FF FF FF 48 8D 1C CD 00 00 00 00 48 83 3C 03 00", 0};
 constexpr size_t kKeyConditionSlot = 0xEA - 0x83;
+// ClientCharacterControlActorComponent's method that returns the chart's cached result for a condition type below 0x83,
+// read from [component+0xD0] + 8 + type.
+constexpr Signature kCachedConditionSignature{
+    "48 89 5C 24 10 57 48 83 EC 20 8B DA 48 8B F9 48 8B 41 08 48 8D 50 08 33 C9 48 85 C0 48 0F 44 D1 48 8B 12 "
+    "48 8D 4C 24 30 E8 ?? ?? ?? ?? 90 48 8D 05 ?? ?? ?? ?? 80 3C 03 01 74 ?? 48 8B 4F 08 E8 ?? ?? ?? ?? 84 C0 75 ?? "
+    "B3 02 EB ?? 48 8B 87 D0 00 00 00 0F B6 5C 18 08",
+    0};
+// How many of ClientCharacterControlActorComponent's vtable slots to search for the cached condition method.
+constexpr size_t kControlVtableSlots = 200;
+// The first condition type the chart's handler table covers. Types below it are read through the cached method.
+constexpr uint32_t kFirstTableCondition = 0x83;
+// The chart condition token T10, "no move input", which every ride chart tests on its branches into slowing.
+constexpr uint32_t kConditionNoInput = 0x10;
+// The chart condition token TE, probably "move input", which the horse's slowing states test on their branches back up to
+// a gait.
+constexpr uint32_t kConditionMoveInput = 0x0E;
+// The chart condition token T66, on which every non-horse land ride chart moves down one gait when Shift isn't held.
+constexpr uint32_t kConditionStepDown = 0x66;
 constexpr uint32_t kKeyBrakeHash = 0x377B9DB8;
 // The input object's vtable slot that takes a key hash and returns whether the key is held.
 constexpr size_t kKeyQuerySlot = 8;
 // Chart condition handlers return 0 when the condition holds.
 constexpr uint8_t kConditionHolds = 0;
+constexpr uint8_t kConditionFails = 1;
 // mov rax,[rip+x]; mov rcx,[rax+0x30], which loads the WorldSystem global far more often than any other global.
 constexpr const char* kWorldReferenceSignature = "48 8B 05 ?? ?? ?? ?? 48 8B 48 30";
 constexpr int kWorldMinRatio = 3;
@@ -77,6 +96,7 @@ constexpr size_t kPhysicsChainDisplacement = 17;
 constexpr const char* kClassActorManager = ".?AVClientActorManager@pa@@";
 constexpr const char* kClassVehicleComponent = ".?AVClientVehicleActorComponent@pa@@";
 constexpr const char* kClassRodeoUi = ".?AVUIGamePlayControlRootMiniGameRodeo@uiCommonScript@pa@@";
+constexpr const char* kClassControlComponent = ".?AVClientCharacterControlActorComponent@pa@@";
 // The slot of UIGamePlayControlRootMiniGameRodeo's vtable that the game calls every frame while the minigame is open and
 // at no other time.
 constexpr size_t kRodeoUiFrameSlot = 47;
@@ -91,24 +111,26 @@ constexpr uint32_t kInput_CameraForward = 0x154;
 constexpr uint32_t kInput_CameraRight = 0x160;
 
 // A land mount's package, its default backward walk speed in m/s, whether S reverses it with the game's brake key instead
-// of the backward walk, and the backward walk speed in use, which LoadSettings sets from ProperHorseControls.ini.
+// of the backward walk, whether its chart steps down one gait on T66, and the backward walk speed in use, which
+// LoadSettings sets from ProperHorseControls.ini.
 struct GroundMount {
     const char* package;
     float defaultBackwardSpeed;
     bool brakeReverse = false;
+    bool stepDown = true;
     float backwardSpeed = defaultBackwardSpeed;
 };
 
 // Water mounts, the dragon and machines are left out. The elephant's, the wagon's and other wolf packages' speeds are
 // untuned.
 GroundMount g_groundMounts[] = {
-    {"CD_R0001_Horse", 1.0f},          {"CD_M0002_Camel", 1.9f},
+    {"CD_R0001_Horse", 1.0f, false, false}, {"CD_M0002_Camel", 1.9f},
     {"CD_M0002_Reindeer", 1.2f},       {"CD_M0002_Elephant", 1.0f},
     {"CD_M0002_BattleBoar", 1.6f},     {"CD_M0002_Bear", 1.8f},
     {"CD_M0002_Wolf", 1.8f},           {"CD_M0002_Wolf_Elite", 1.7f},
     {"CD_M0002_Wolf_Elite_Big", 1.8f}, {"CD_M0002_Wolf_Boss", 1.8f},
     {"CD_R0034_Iguana", 1.2f},         {"CD_R0035_CarmaBirdsaurus", 1.6f},
-    {"CD_M0003_CucuBird", 1.0f},       {"CD_R0012_Wagon_0001", 1.0f, true},
+    {"CD_M0003_CucuBird", 1.0f},       {"CD_R0012_Wagon_0001", 1.0f, true, false},
 };
 
 // The widest angle TightenSteering turns the stick to, in radians, which keeps some forward input at every bias.
@@ -150,6 +172,13 @@ constexpr ULONGLONG kBrakeGapMaxMs = 3000;
 constexpr float kBrakeGapSteerX = 0.3f;
 // UpdateBrakeGap ends below this speed in m/s, so that forward input works again once the mount has stopped.
 constexpr float kBrakeGapStopSpeed = 0.3f;
+// A step down expects the chart to move this long after the state's first kStepDownStateMs, which its TBA(0.5,4) waits
+// for, and otherwise slows the mount instead.
+constexpr ULONGLONG kStepDownStateMs = 500;
+constexpr ULONGLONG kStepDownWaitMs = 200;
+// After a step down from S or a stick pulled back, the chart keeps reading move input for at most this long while it's
+// held, so that holding it still slows the mount.
+constexpr ULONGLONG kHoldInputMs = 500;
 // A gap on g_brakeMount that starts above this chart value can end early, below this speed in m/s.
 constexpr float kBrakeMountLowValue = 4.0f;
 constexpr float kBrakeMountEndSpeed = 5.0f;
@@ -195,6 +224,9 @@ uintptr_t g_hookSite = 0;
 uintptr_t g_stickSite = 0;
 uintptr_t g_keyCheck = 0;
 uintptr_t g_conditionTableCall = 0;
+// The cached condition method and its slot in ClientCharacterControlActorComponent's vtable.
+uintptr_t g_cachedCondition = 0;
+uintptr_t* g_cachedConditionSlot = nullptr;
 std::atomic<bool> g_enabled{true};
 // The number of owners in g_suspendOwners. RidingGroundMount reads it without g_suspendLock.
 std::atomic<int> g_suspendCount{0};
@@ -239,13 +271,29 @@ std::atomic<bool> g_backwardWalking{false};
 // The ground mount that S reverses with the brake key, or 0, and whether S is braking it.
 std::atomic<uintptr_t> g_brakeMount{0};
 std::atomic<bool> g_braking{false};
-// Whether a stick gap is running.
+// Whether a slowdown is running. While it is, OnCachedCondition answers T10 as holding for the mount, or without it
+// OnStickRead zeroes the stick.
 std::atomic<bool> g_brakeGap{false};
+// The ground mount whose chart steps down one gait on T66, or 0, and whether OnCachedCondition answers T66 as holding
+// for it.
+std::atomic<uintptr_t> g_stepDownMount{0};
+std::atomic<bool> g_stepDown{false};
+// Whether OnCachedCondition answers T10 as not holding and TE as holding for g_stepDownMount, so that its chart reads
+// move input while S or a stick pulled back zeroes the stick during and after a step down.
+std::atomic<bool> g_holdInput{false};
 // The mount input component's raw stick before OnStickRead edits it, for logging.
 std::atomic<float> g_rawStickX{0}, g_rawStickY{0};
 
 using ConditionHandler = uint8_t (*)(uintptr_t, uintptr_t*, void*, void*, uint8_t, void*, void*);
 ConditionHandler g_keyCondition = nullptr;
+using CachedConditionRead = uint8_t (*)(uintptr_t, uint32_t, uint8_t, void*);
+CachedConditionRead g_cachedConditionRead = nullptr;
+// The ground mount's last T10 result, or -1 before the first read, for logging.
+std::atomic<int> g_mountNoInput{-1};
+// The mount whose condition reads OnCachedCondition last logged, or 0 to log every type's first read again.
+std::atomic<uintptr_t> g_conditionLogMount{0};
+// The ground mount's ClientInputActorComponent, whose raw stick holds what the update read after OnStickRead's edit.
+std::atomic<uintptr_t> g_mountInput{0};
 
 const IMAGE_NT_HEADERS* GameHeaders();
 bool KeyDown(int vk);
@@ -821,12 +869,18 @@ bool BrakeKeyHeld() {
     }
 }
 
-// Return whether forward input should read as released, so that the chart slows the mount. This starts when S is pressed
-// with W held, the brake key is pressed with forward true, or backward becomes true, while the mount is at
-// kBrakeGapMinSpeed or above in a chart state with a value
-// above 0. It ends on the second consecutive change into a chart state whose value is 0 or missing, below
-// kBrakeGapStopSpeed, on steering, or after kBrakeGapMaxMs. A gap on g_brakeMount that started above kBrakeMountLowValue also ends on the first such
-// change once speed is below kBrakeMountEndSpeed, so that a tap at cruise doesn't run on to the time cap.
+// Return whether a slowdown or step down is running. Either starts when S is pressed with W held, the brake key is
+// pressed with forward true, or backward becomes true, while the mount is at kBrakeGapMinSpeed or above in a chart state
+// with a value above 0.
+//
+// On g_stepDownMount, a step down sets g_stepDown, so that the chart reads T66 and moves down one gait. It ends when the
+// chart state changes or the mount is below kBrakeGapStopSpeed. If the state hasn't changed kStepDownWaitMs after the
+// state's first kStepDownStateMs, there's no gait below, and a slowdown starts instead.
+//
+// A slowdown sets g_brakeGap, so that the chart reads no move input. It ends on the second consecutive change into a
+// chart state whose value is 0 or missing, below kBrakeGapStopSpeed, on steering, or after kBrakeGapMaxMs. A slowdown on
+// g_brakeMount that started above kBrakeMountLowValue also ends on the first such change once speed is below
+// kBrakeMountEndSpeed, so that a tap at cruise doesn't run on to the time cap.
 bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward) {
     static bool sWas = false, backwardWas = false, brakeWas = false;
     static uintptr_t lastState = 0;
@@ -852,19 +906,71 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
         Log("brake key press tick=%llu forward=%d steering=%d speed=%.2f value=%.3f", now, forward ? 1 : 0,
             steering ? 1 : 0, speed, value);
     }
-    if (!g_brakeGap.load()) {
-        if (!pressed || steering || speed < kBrakeGapMinSpeed || !haveState || value <= 0.0f ||
-            g_backwardWalking.load()) {
-            return false;
+    // When the chart entered its current state, for the step down's TBA(0.5,4) wait.
+    static uintptr_t seenState = 0;
+    static ULONGLONG stateSince = 0;
+    static ULONGLONG stepDeadline = 0;
+    if (haveState && state != seenState) {
+        seenState = state;
+        stateSince = now;
+    }
+    // W with S, or a stick pulled back, reads as no move input, which would send the chart into its slowing node after a
+    // step down. g_holdInput keeps it reading input until that's released, or for kHoldInputMs after the step ends.
+    static ULONGLONG holdCap = 0;
+    if (g_holdInput.load()) {
+        const char* reason = !s && !backward                ? "released"
+                             : holdCap && now >= holdCap    ? "held"
+                                                            : nullptr;
+        if (reason) {
+            g_holdInput = false;
+            Log("hold input end tick=%llu speed=%.2f reason=%s", now, speed, reason);
         }
+    }
+    const auto startSlowdown = [&](const char* source) {
         g_brakeGap = true;
         startValue = value;
         lastState = state;
         slowingStates = 0;
         start = now;
         Log("brake gap start tick=%llu speed=%.2f value=%.3f state=%04X shift=%d source=%s", now, speed, value,
-            static_cast<uint16_t>(state), KeyDown(VK_SHIFT) ? 1 : 0,
-            sPressed ? "S" : backwardPressed ? "stick" : "brake key");
+            static_cast<uint16_t>(state), KeyDown(VK_SHIFT) ? 1 : 0, source);
+    };
+    if (g_stepDown.load()) {
+        const char* reason = haveState && state != lastState ? "gait changed"
+                             : speed < kBrakeGapStopSpeed    ? "stopped"
+                             : now >= stepDeadline           ? "no step"
+                                                             : nullptr;
+        if (!reason) return true;
+        g_stepDown = false;
+        Log("step down end tick=%llu after=%llums speed=%.2f state=%04X value=%.3f reason=%s", now, now - start, speed,
+            static_cast<uint16_t>(state), value, reason);
+        holdCap = now + kHoldInputMs;
+        if (strcmp(reason, "no step") != 0) return false;
+        // No gait below this one, so slow the mount instead.
+        g_holdInput = false;
+        startSlowdown("no step");
+        return true;
+    }
+    if (!g_brakeGap.load()) {
+        if (!pressed || steering || speed < kBrakeGapMinSpeed || !haveState || value <= 0.0f ||
+            g_backwardWalking.load()) {
+            return false;
+        }
+        const char* source = sPressed ? "S" : backwardPressed ? "stick" : "brake key";
+        if (ride.mount == g_stepDownMount.load() && g_cachedConditionRead) {
+            g_stepDown = true;
+            if (sPressed || backwardPressed) {
+                g_holdInput = true;
+                holdCap = 0;
+            }
+            lastState = state;
+            start = now;
+            stepDeadline = std::max(now, stateSince + kStepDownStateMs) + kStepDownWaitMs;
+            Log("step down start tick=%llu speed=%.2f value=%.3f state=%04X in state %llums shift=%d source=%s", now,
+                speed, value, static_cast<uint16_t>(state), now - stateSince, KeyDown(VK_SHIFT) ? 1 : 0, source);
+            return true;
+        }
+        startSlowdown(source);
         return true;
     }
     if (haveState && state != lastState) {
@@ -889,8 +995,9 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
 // and tighten forward steering. S alone starts the backward walk, and A or D during it steers. On g_brakeMount, S brakes
 // instead, which the chart takes as reverse, and A or D pass through as they do with the brake key. In both reverses,
 // g_backwardSteerInvert swaps A and D. Forward steering ramps in over g_keyRampMs, or at least kStandingRampMs from
-// standing, only for digital input, as an analog stick already moves gradually. With g_cameraDetached off, the only edit is the zeroed stick of a UpdateBrakeGap slowdown, which needs
-// g_tapBrake.
+// standing, only for digital input, as an analog stick already moves gradually. During a UpdateBrakeGap slowdown, the
+// stick is zeroed only if OnCachedCondition isn't installed to answer T10, and with g_cameraDetached off that's the only
+// edit.
 void OnStickRead(SafetyHookContext& ctx) {
     const Ride ride = ResolveRide();
     if (!RidingGroundMount(ride)) {
@@ -898,6 +1005,8 @@ void OnStickRead(SafetyHookContext& ctx) {
         g_backwardWalking = false;
         UpdateBraking(false);
         g_brakeGap = false;
+        g_stepDown = false;
+        g_holdInput = false;
         return;
     }
     float velX = 0, velZ = 0;
@@ -908,15 +1017,22 @@ void OnStickRead(SafetyHookContext& ctx) {
     if (Read(ctx.rdi + kInput_Actor, inputActor) && inputActor == ride.mount) {
         g_rawStickX = stick[0];
         g_rawStickY = stick[1];
+        g_mountInput = ctx.rdi;
     }
-    if (!g_tapBrake.load()) g_brakeGap = false;
+    if (!g_tapBrake.load()) {
+        g_brakeGap = false;
+        g_stepDown = false;
+        g_holdInput = false;
+    }
     if (!g_cameraDetached.load()) {
         UpdateBackwardPulse(false);
         UpdateBraking(false);
         // The stick's direction is relative to the camera here, so it says nothing about steering or backward input.
         if (g_tapBrake.load() && UpdateBrakeGap(ride, false, false, std::hypot(stick[0], stick[1]) > 0.01f)) {
-            stick[0] = stick[1] = 0.0f;
-            SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
+            if (!g_cachedConditionRead) {
+                stick[0] = stick[1] = 0.0f;
+                SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
+            }
         }
         return;
     }
@@ -938,16 +1054,21 @@ void OnStickRead(SafetyHookContext& ctx) {
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
         return;
     }
-    if (g_tapBrake.load() && UpdateBrakeGap(ride, std::fabs(stick[0]) > kBrakeGapSteerX, backward, stick[1] > 0.0f)) {
+    // Answering T10 leaves the stick as is, so steering can carry on through the slowdown instead of blocking or ending it.
+    const bool answerNoInput = g_cachedConditionRead != nullptr;
+    const bool gap = g_tapBrake.load() && UpdateBrakeGap(ride, !answerNoInput && std::fabs(stick[0]) > kBrakeGapSteerX,
+                                                         backward, stick[1] > 0.0f);
+    if (gap && !answerNoInput) {
         UpdateBackwardPulse(false);
         stick[0] = stick[1] = 0.0f;
         SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
         return;
     }
-    const bool reverseSteering = backward && steering && g_backwardWalking.load();
-    const bool pulse = UpdateBackwardPulse(backward && (!steering || reverseSteering));
+    const bool backwardWalk = backward && !gap;
+    const bool reverseSteering = backwardWalk && steering && g_backwardWalking.load();
+    const bool pulse = UpdateBackwardPulse(backwardWalk && (!steering || reverseSteering));
     UpdateBackwardRecovery(ride, steering);
-    if (backward) {
+    if (backwardWalk) {
         if (reverseSteering) {
             // Scale by the stick's sideways push relative to its backward push, which is 1 for keys and diagonals.
             const float share = std::fabs(stick[0]) / std::max(std::fabs(stick[0]), std::fabs(stick[1]));
@@ -1043,17 +1164,22 @@ uint8_t OnKeyCondition(uintptr_t context, uintptr_t* condition, void* a3, void* 
     return actor != 0 && actor == g_brakeMount.load() ? kConditionHolds : result;
 }
 
-// Return the key condition's slot in the chart condition handler table, or null if it doesn't hold g_keyCheck.
-uintptr_t* FindKeyConditionSlot() {
+// Return the chart condition handler table, or null if the getter fails.
+uintptr_t* FindConditionTable() {
     __try {
         int32_t offset = 0;
         memcpy(&offset, reinterpret_cast<const void*>(g_base + g_conditionTableCall + 1), sizeof offset);
         const auto getTable = reinterpret_cast<uintptr_t* (*)()>(g_base + g_conditionTableCall + 5 + offset);
-        uintptr_t* table = getTable();
-        return table && table[kKeyConditionSlot] == g_base + g_keyCheck ? &table[kKeyConditionSlot] : nullptr;
+        return getTable();
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         return nullptr;
     }
+}
+
+// Return the key condition's slot in the chart condition handler table, or null if it doesn't hold g_keyCheck.
+uintptr_t* FindKeyConditionSlot() {
+    uintptr_t* table = FindConditionTable();
+    return table && table[kKeyConditionSlot] == g_base + g_keyCheck ? &table[kKeyConditionSlot] : nullptr;
 }
 
 // Replace the key condition's handler table slot with OnKeyCondition, which calls the original, so that another mod's
@@ -1073,6 +1199,61 @@ void InstallBrakeKey() {
     *slot = reinterpret_cast<uintptr_t>(&OnKeyCondition);
     VirtualProtect(slot, sizeof(uintptr_t), oldProtect, &oldProtect);
     Log("brake key installed at table slot %p", static_cast<void*>(slot));
+}
+
+// Return the game's cached result for a chart condition type below kFirstTableCondition, with the ground mount's
+// answers changed: while g_brakeGap is set it reads T10 as holding and TE as not, so that the chart sees no move input,
+// while g_stepDown is set it reads T66 as holding, and while g_holdInput is set it reads move input. With logging, for
+// the ground mount, log the first read of each type after each mount or remount, and each change of T10 with the game's
+// answer and the raw stick before and after OnStickRead's edit.
+uint8_t OnCachedCondition(uintptr_t component, uint32_t type, uint8_t a3, void* a4) {
+    const uint8_t gameResult = g_cachedConditionRead(component, type, a3, a4);
+    const uintptr_t mount = g_groundMount.load();
+    uintptr_t actor = 0;
+    if (mount == 0 || type >= kFirstTableCondition || !Read(component + 8, actor) || actor != mount) return gameResult;
+    uint8_t result = gameResult;
+    if (g_brakeGap.load()) {
+        if (type == kConditionNoInput) result = kConditionHolds;
+        if (type == kConditionMoveInput) result = kConditionFails;
+    }
+    if (g_stepDown.load() && type == kConditionStepDown) result = kConditionHolds;
+    if (g_holdInput.load()) {
+        if (type == kConditionNoInput) result = kConditionFails;
+        if (type == kConditionMoveInput) result = kConditionHolds;
+    }
+    if (!g_logging) return result;
+    static std::atomic<uint64_t> seen[3];
+    if (g_conditionLogMount.exchange(mount) != mount) {
+        for (auto& bits : seen) bits = 0;
+        g_mountNoInput = -1;
+    }
+    const uint64_t bit = 1ull << (type % 64);
+    if ((seen[type / 64].fetch_or(bit) & bit) == 0) {
+        Log("mount condition 0x%02X first read: %d", type, result);
+    }
+    if (type == kConditionNoInput && g_mountNoInput.exchange(result) != result) {
+        float sent[2] = {kMissing, kMissing};
+        const uintptr_t input = g_mountInput.load();
+        if (input) SafeRead(input + kInput_RawStick, sent, sizeof sent);
+        Log("T10 %d game %d tick=%llu raw stick %.3f, %.3f sent %.3f, %.3f", result, gameResult, GetTickCount64(),
+            g_rawStickX.load(), g_rawStickY.load(), sent[0], sent[1]);
+    }
+    return result;
+}
+
+// Replace the cached condition slot of ClientCharacterControlActorComponent's vtable with OnCachedCondition. Without it,
+// a slowdown zeroes the stick instead, so steering blocks it.
+void InstallNoInputAnswer() {
+    if (!g_cachedConditionSlot) return;
+    DWORD oldProtect = 0;
+    if (!VirtualProtect(g_cachedConditionSlot, sizeof(uintptr_t), PAGE_READWRITE, &oldProtect)) {
+        LogProblem("no input answer: vtable protection failed, so the slowdown doesn't start while steering");
+        return;
+    }
+    g_cachedConditionRead = reinterpret_cast<CachedConditionRead>(*g_cachedConditionSlot);
+    *g_cachedConditionSlot = reinterpret_cast<uintptr_t>(&OnCachedCondition);
+    VirtualProtect(g_cachedConditionSlot, sizeof(uintptr_t), oldProtect, &oldProtect);
+    Log("no input answer installed at vtable slot %p", static_cast<void*>(g_cachedConditionSlot));
 }
 
 bool KeyDown(int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
@@ -1141,8 +1322,8 @@ void WriteTelemetry(const Ride& ride, const std::string& package) {
     fprintf(g_csv, ",%llX,%.3f,%.3f,%.3f,%.3f,%.2f", static_cast<unsigned long long>(chartState), chartValue,
             haveVelocity ? velX : kMissing, haveVelocity ? velZ : kMissing,
             haveVelocity ? std::hypot(velX, velZ) : kMissing, haveRider ? riderPos.y : kMissing);
-    fprintf(g_csv, ",%s,%.2f,%.3f,%.3f,%d,%d\n", package.c_str(), g_backwardRate.load(), g_rawStickX.load(),
-            g_rawStickY.load(), KeyDown(VK_SHIFT) ? 1 : 0, g_brakeGap.load() ? 1 : 0);
+    fprintf(g_csv, ",%s,%.2f,%.3f,%.3f,%d,%d,%d\n", package.c_str(), g_backwardRate.load(), g_rawStickX.load(),
+            g_rawStickY.load(), KeyDown(VK_SHIFT) ? 1 : 0, g_brakeGap.load() ? 1 : 0, g_mountNoInput.load());
     ++rows;
     if (now - lastFlush > 1000) {
         fflush(g_csv);
@@ -1330,6 +1511,29 @@ bool LookupSignature(const char* name, const Signature& signature, uintptr_t& ou
     return true;
 }
 
+// Set g_cachedConditionSlot to the slot of ClientCharacterControlActorComponent's vtable that holds the cached condition
+// method, and log the result. Leave it null if the vtable, the method or the slot isn't found.
+void LookupCachedConditionSlot() {
+    const std::vector<uintptr_t> vtables = FindVtables(kClassControlComponent);
+    if (vtables.size() != 1) {
+        LogProblem("lookup vtControlComponent not found (optional): %zu vtables", vtables.size());
+        return;
+    }
+    Log("lookup vtControlComponent: exe+0x%llX", static_cast<unsigned long long>(vtables[0]));
+    if (!LookupSignature("cachedCondition", kCachedConditionSignature, g_cachedCondition, false)) return;
+    auto* vtable = reinterpret_cast<uintptr_t*>(g_base + vtables[0]);
+    for (size_t i = 0; i < kControlVtableSlots; ++i) {
+        uintptr_t entry = 0;
+        if (!Read(reinterpret_cast<uintptr_t>(&vtable[i]), entry)) break;
+        if (entry == g_base + g_cachedCondition) {
+            g_cachedConditionSlot = &vtable[i];
+            Log("lookup cachedConditionSlot: %zu", i);
+            return;
+        }
+    }
+    LogProblem("lookup cachedConditionSlot not found (optional) in the first %zu slots", kControlVtableSlots);
+}
+
 // Set g_worldSystemSlot to the global that kWorldReferenceSignature loads most, and log the result. Return false unless
 // it has at least kWorldMinRatio times the references of the next.
 bool LookupWorldSystemSlot() {
@@ -1403,6 +1607,7 @@ bool RunLookups() {
     ok &= LookupSignature("stickSite", kStickSiteSignature, g_stickSite, true);
     LookupSignature("keyCheck", kKeyCheckSignature, g_keyCheck, false);
     LookupSignature("conditionTableCall", kConditionTableCallSignature, g_conditionTableCall, false);
+    LookupCachedConditionSlot();
     Log("lookups took %llu ms", GetTickCount64() - start);
     return ok;
 }
@@ -1425,9 +1630,11 @@ bool InstallHook() {
     const bool rodeoSwitch = InstallRodeoSwitch();
     if (g_keyCheck && g_logging) LogKeyCheckBytes();
     InstallBrakeKey();
+    InstallNoInputAnswer();
     std::string missing;
     if (!rodeoSwitch) missing += ", taming minigame pause";
     if (!g_keyCondition) missing += ", brake key";
+    if (!g_cachedConditionRead) missing += ", slowing while steering";
     if (missing.empty()) {
         Log("MOD ACTIVE: all features enabled.");
     } else {
@@ -1458,7 +1665,7 @@ DWORD WINAPI ModThread(void* param) {
               "i0_applied,i0_stick_x,i0_stick_y,i0_angle,i0_relative,i0_camera_yaw,i0_target_yaw,"
               "i1_applied,i1_stick_x,i1_stick_y,i1_angle,i1_relative,i1_camera_yaw,i1_target_yaw,"
               "mount_state,mount_value,mount_vel_x,mount_vel_z,mount_vel,rider_y,mount_package,backward_rate,"
-              "raw_stick_x,raw_stick_y,shift,brake_gap\n",
+              "raw_stick_x,raw_stick_y,shift,brake_gap,t10\n",
               g_csv);
     }
 
@@ -1506,11 +1713,17 @@ DWORD WINAPI ModThread(void* param) {
                 reinterpret_cast<void*>(ride.mount), ride.forwardFromMount ? "mount" : "rider");
             wasMounted = ride.mounted;
             wasFromMount = ride.forwardFromMount;
+            if (!ride.mounted) {
+                g_conditionLogMount = 0;
+                g_mountNoInput = -1;
+                g_mountInput = 0;
+            }
         }
         if (ride.mount != currentMount) {
             currentMount = ride.mount;
             g_groundMount = 0;
             g_brakeMount = 0;
+            g_stepDownMount = 0;
             classified = reportedUnknown = false;
             package.clear();
             if (currentMount) Log("mount appearance: %s", ReadAppearance(currentMount).c_str());
@@ -1523,6 +1736,7 @@ DWORD WINAPI ModThread(void* param) {
                 g_backwardRate = ground->backwardSpeed * kBackwardRatePerSpeed;
                 const bool brake = ground->brakeReverse && g_keyCondition;
                 if (brake) g_brakeMount = currentMount;
+                if (ground->stepDown) g_stepDownMount = currentMount;
                 Log("mount package: %s key=0x%08X tick=%llu (controls on, backward speed %.2f m/s, reverse by %s)",
                     package.c_str(), ride.mountKey, now, ground->backwardSpeed, brake ? "brake key" : "backward walk");
             } else if (!reportedUnknown) {

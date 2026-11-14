@@ -39,8 +39,10 @@ Constraints from the tester, for any S-based slowdown:
 - **Shift and dash are the same input,** so `key_run` and `key_dash` go together. The `T10` branches out of gallop nodes
   `#24` and `#110` need both released, but with Shift held in stage 21 a stick gap still left state `E38E`, and
   `mount_value` returned to 14 within about 1 s.
-- **A gait only rises with Shift, and holds once Shift is released.** A mount skill gives faster travel for a time past a
-  gallop, and needs W and Shift held.
+- **A gait only rises with Shift, and holds once Shift is released.** Holding W keeps the current gait, and each Shift
+  tap raises it one gait: walk, trot, canter, gallop 1 and gallop 2 (the gait table is in
+  [horsesteer-tests/README.md](../horsesteer-tests/README.md)). A mount skill gives faster travel for a time past
+  gallop 2, and needs W and Shift held. After a slowdown, the mount stays at the lower gait until Shift is tapped.
 - **Mount speeds can't be a static table.** Mounts differ in stats, several horse breeds have different top speed and
   acceleration, and trust level changes those further. Maximum stats also take riding time to unlock, so logging each
   mount in live play isn't practical. Anything scaled to a mount, such as a position write, must be derived from the
@@ -113,6 +115,117 @@ From [stage 24](../horsesteer-tests/stage-24.md) and [stage 25](../horsesteer-te
 - **Hold:** W and Alt held brought the horse to a stop. The camel slowed but didn't fully stop, which the tester accepted.
 - **Drift:** Alt with A or D, and Alt followed by A or D, still drift. All 7 steering presses logged had W released, so
   a press with W and a steering key already held was never logged.
+
+## Slowing while steering
+
+On build `0x6AF5D198` with v1.3.1, the brake key, or S with A or D, while turning at a canter or above doesn't slow
+the mount unless the brake key is held. Below a canter, a tap slows it. Logs are in `scratch/probe-runs/gamepad-drift-1/`
+(KBM and gamepad, with a mod-off stretch) and `scratch/probe-runs/slow-steer-2/` (KBM, gamepad, and gamepad with
+`CameraDetached=0`).
+
+- **Cause:** the horse stays in `C5AF`, the canter slowing state, only while its slowing condition (`OR T10 key_brake`)
+  holds, and moves on to `B7CC` after 250 to 900 ms. A tap releases `key_brake` before then, and with stick input `T10`
+  is false, so the chart returns to `C2B2`. The base game does the same: mod off, one press went `C5AF`, `C2B2`, and the
+  next went on to `B7CC`. Trot and below move on at once, so a tap works there.
+- **Why the mod's straight taps work:** the gap zeroes the stick, which keeps `T10` true until the next state. With
+  `CameraDetached=0` every press starts a gap, and all 11 dropped a gait, 7 of them from `C2B2` through `C5AF`.
+- **Why turning taps don't:** `UpdateBrakeGap` won't start a gap while `steering` and ends one on `reason=steering`. With
+  steering, a brake key press leaves only `key_brake`. In `slow-steer-2`, 6 of 11 canter presses with `steering=1`
+  returned to `C2B2` within 30 to 95 ms, and the other 5 reached `B7CC`, which the tester confirmed were held presses.
+- **S with A or D:** the S tap needs W held, so with W released no gap starts. The mod writes y = 0 with x = ±1, which
+  the chart treats as a canter turn. In `gamepad-drift-1`, 4.6 s of S with D and 8.1 s of S with A kept the canter.
+
+Constraints from the tester for any fix:
+
+- **Drift:** not a concern. The mount drifts when the chart's keys and state for it are met.
+- **Backward walk:** must not change.
+- **Consistency:** braking should behave the same on every eligible mount, which is worth some extra brittleness to
+  game updates, such as more lookups.
+- **Special handling:** handling beyond the horse's, like the removed position write, can come back, but only for
+  mounts whose charts don't read `key_brake`. If the mod can answer `T10` and `TC9` itself (below), the chart makes its
+  own transitions and the position write shouldn't be needed.
+
+**Fix to explore: answer `T10` as true for the mount** from the press until the next slowing state, with the stick left
+as is, so steering continues. `key_brake` and drift are untouched.
+
+- **Other mounts:** every ride chart enters its slowing node through `T10`. From the action charts, each gait node of the
+  bear, camel, warthog, wolf, reindeer, elephant, iguana and both birds branches on `T10` to a node without a clip. That
+  node goes to the slowing node on `OR T122(0, 50) T122(0, 51)`, and otherwise to the stop node. The slowing node's only
+  ground exits are its speed check (`TC9`) and skills, so unlike the horse's `C5AF` it doesn't need the condition held.
+  Since this is the same `T10` the zeroed stick gives, the landing gaits would match today's straight taps: the bear on
+  5.2 and the camel on 3.5.
+- **Source:** `tools/chart_node_branches.py CDMW_SRC scratch/out/charts CHART NODE` lists the branches into and out of
+  a node, such as `m0002_ride_camel_upper 28`.
+
+- **Where `T10` is evaluated:** found statically. Types below `0x83`, `T10` among them, go through slot 77 of
+  `ClientCharacterControlActorComponent`'s vtable, which reads a per-type cache, so replacing that slot can answer `T10`
+  for the mount only. See [offsets.md](offsets.md) (Chart condition evaluation).
+- **Gait conditions:** gait nodes change on `T167(k, 0)` and `T1E3(mode, value)`, not on speed. The bear's gait nodes
+  are `#41`, `#15` and `#30`, with `#16` for the skill gait. Going up needs `key_run` with `T167(3, 0)` or `T167(4, 0)`
+  and `T1E3(4, v)`, and going down is on `OR T1E3(5, v) NOT T167(...)`. Its `v` values are 5.0, 9.0 and 13.0. The
+  horse's chart uses `T167` 125 times: its canter needs `T167(4, 0)` and its gallop `T167(5, 0)`. `T167` may be the
+  gear Shift selects, and `T1E3` may check the mount's stats, which would explain gaits unlocking with level.
+  [Stage 43](../horsesteer-tests/stage-43.md) found `T167` answering 0 for every read all session, so it isn't the
+  gear. It's probably "gait `k` is unlocked". Mounts other than the horse have no levels, and every gait is available
+  from the start (tester), so on them it would always hold.
+- **One gait down on `T66`:** in the charts extracted for `0x6AF5D198` (`scratch/out/charts-6AF5D198/`), each gait
+  node of every non-horse land ride chart has a branch to the gait below on `TBA(0.5,4)`, then `AND T66 NOT key_run`:
+  the bear's `#16`, `#30`, `#15`, `#41`, the camel's `#27` and `#23`, `#13`, `#35`, `#24`, and the wolf's `#24`, `#20`,
+  `#3`, `#15`. The bull, elephant, reindeer, warthog, cucu bird and Carma bird charts have 5 or 6 `T66` branches each.
+  The horse's chart has one, from its fast gallop `#220` to `#128`. `T66` is type `0x66`, read through slot 77, and
+  the game answered 1 (not holding) on every mount in stages 38 and 43. What it means in game isn't known.
+- **The `T66` ladder in every eligible chart:** each of the nine non-horse land ride charts has four gaits in a line,
+  where Shift (`key_run`) goes up a step and `T66` without Shift goes down exactly the step Shift came up. The lowest
+  has no `T66` branch. Gaits from lowest to highest, by node:
+
+  | Chart | Gaits | Other nodes stepping down on `T66` |
+  | --- | --- | --- |
+  | Bear | `#41`, `#15`, `#30`, `#16` | `#0` to `#30` |
+  | Camel | `#24`, `#35`, `#13`, `#23` | `#27` to `#13` |
+  | Reindeer | `#39`, `#15`, `#30`, `#41` | `#3` to `#30` |
+  | Elephant | `#6`, `#9`, `#23`, `#1` | `#3` to `#23` |
+  | Warthog (battle boar) | `#42`, `#29`, `#44`, `#4` | `#15` and `#23` to `#44` |
+  | Wolf | `#15`, `#3`, `#20`, `#8` | `#6` and `#24` to `#20` |
+  | Iguana | `#5`, `#8`, `#27`, `#37` | `#31` to `#27` |
+  | Carma bird | `#25`, `#37`, `#13`, `#39` | `#10` to `#13` |
+  | Cucu bird | `#14`, `#9`, `#12`, `#8` | `#19` to `#12` |
+
+  Every one of these branches is `TBA(0.5,4)`, then `AND T66 NOT key_run`, except one each on the wolf and warthog:
+  `AND TBA(2,3) NOT T1E4(0, 0)`, then `AND NOT key_run T66`. `TBA(0.5,4)` is probably at least 0.5 s in the state,
+  so a step down would wait for that after a Shift tap. The wagon isn't included.
+- **Chart numbering on `0x6AF5D198`:** `AND`, `OR` and `NOT` are `0x28B`, `0x28C` and `0x28D`, so the interpreter's
+  tokens in [offsets.md](offsets.md) are confirmed. Types from about `0x1E3` up moved by 2 or 3, such as `T1E3` to
+  `T1E5` and `T27E` to `T281`. `T10`, `TE`, `T66`, `T167`, `TC9` and `key_brake` kept their numbers.
+  `tools/chart_node_branches.py` still decodes the logic tokens with the old numbers.
+- **One-gait drops on other mounts:** `T10` gets them into their slowing node, but they still leave it at the node's
+  fixed `TC9` speed. Answering that `TC9` as true at the next gait's speed, while the chart is in the slowing node, could
+  make them leave one gait down. `TC9` is type `0xC9`, so it goes through the handler table `InstallBrakeKey` patches.
+  This isn't designed or tested.
+
+- **Encoding ([stage 38](../horsesteer-tests/stage-38.md)):** slot 77 returns 0 when `T10` holds and 1 otherwise, and
+  `T10` is "no move input". Any stick input counts, including x alone and a sent y of 0.03. The horse, bear, camel and
+  wolf all read `T10` through slot 77, and every change to 0 came on the tick the chart entered a slowing state. So
+  answering 0 for the mount should be enough to send each chart into its slowing node.
+
+- **Answering slot 77 alone ([stage 39](../horsesteer-tests/stage-39.md)):** fails. The chart enters the slowing state
+  on the answer and leaves it on the next frame, every 30 to 50 ms, on the horse from a canter and on the wolf, with or
+  without steering. The check that keeps the chart in the slowing state, the in-branch's second condition program
+  (`OR T10 key_brake` on the horse), doesn't see the answer. Gallop taps pass through `D85C` and work.
+  [Stage 40](../horsesteer-tests/stage-40.md) found that only the interpreter's entry check reads `T10` through slot 77,
+  once per entry. [Stage 41](../horsesteer-tests/stage-41.md) wrote 0 to the cache byte too, and it still flipped.
+- **What sends the chart back:** the horse's slowing states branch back up to a gait on `TE` (type `0x0E`) and not
+  `key_brake`, such as node 0 to node 82: `AND T167(4, 0) TC9(4.2,4)`, then `AND OR TE AND TE key_run NOT key_brake`.
+  `TE` reads 0 for the mount while there's stick input, so it looks like "move input", the opposite of `T10`. A zeroed
+  stick fails it and a held brake key fails `NOT key_brake`, which is why both stay down, and why a brake key tap without
+  the mod bounces. [Stage 42](../horsesteer-tests/stage-42.md) answered `TE` as not holding during a gap as well, and
+  passed on the horse and bear: no flipping, one gait per tap on the horse, and turning at the usual 52 to 74°/s.
+
+To check, in order, once the chart stays in the slowing state:
+
+1. Whether a mount keeps turning in its slowing node with x held. Mod-off Alt with A suggests the horse does.
+2. Whether on-foot charts use `T10`. The answer would be limited to the mount actor, as `OnKeyCondition` does.
+
+If it works, it replaces the gap's zeroed stick on every mount, horse included.
 
 ## Reading and overriding keys
 

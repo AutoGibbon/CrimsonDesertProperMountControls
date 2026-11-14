@@ -16,7 +16,7 @@ actual horse (I have never ridden a horse IRL but this feels like a good way to 
 
 - Horsie go where horsie look! You look but horsie not care. Horsie go where horsie look. (why am I writing like this?)
 - Change where horsie look with A and D (or stick). So easy.
-- Change horsie speed with tap on S / brake / back on stick, hold to slow down all the way.
+- Change horsie speed with tap on S / brake / back on stick, hold to slow down all the way. One tap = one gait slower.
 - Horsie can reverse now. Like... walk backwards. Waow.
 - Wagon go where horsie look!
 - Wagon reverse with S key (or down on stick). Still reverse with normal button too.
@@ -148,8 +148,9 @@ Horsie would not go where horsie look if not for these, so thank you for all you
 - [CrimsonDesertModdingTools](https://github.com/NattKh/CrimsonDesertModdingTools) - game table field name research
 - [Horse Tap Brake](https://www.nexusmods.com/crimsondesert/mods/3666) - learned how to examine mount chart state,
   velocity and key reads, and update-safe callsite lookups. Also the idea of tapping to slow down and when to let go,
-  used with its author's permission. Not a clone: Horse Tap Brake holds the game's brake for you, this mod lets go of
-  the stick for you, so it works on mounts that don't have a brake key in their animation packages.
+  used with its author's permission. Not a clone: Horse Tap Brake holds the game's brake for you, this mod tells the
+  mount's animation chart you let go of the stick (or to drop a gait), so it works on mounts that don't have a brake key
+  in their animation packages.
 - [Crimson Save Editor](https://www.nexusmods.com/crimsondesert/mods/3748) - adding mounts to save files for testing
 - [DMM](https://www.nexusmods.com/crimsondesert/mods/633) - mod manager, used for install and testing
 - [SafetyHook](https://github.com/cursey/safetyhook) and [Zydis](https://github.com/zyantific/zydis) - function hooking

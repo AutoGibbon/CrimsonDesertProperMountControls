@@ -1,3 +1,7 @@
+Version 1.4.0
+Improved tap braking behaviour on special mounts. Previous versions of the mod used simpler input driven methods to slow down mounts, but I had to go deeper and directly instruct their action charts. This way works much better and I have more control over mount state this way.
+Fixed tap braking while turning behaviour on all mounts. Technically a fix and and improvement in one.
+
 Version 1.3.2
 Updated for compatibility with Game 2.05.00 Update
 

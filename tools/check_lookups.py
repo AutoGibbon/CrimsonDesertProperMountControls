@@ -14,6 +14,7 @@ VTABLES = {
     "vtActorManager": ".?AVClientActorManager@pa@@",
     "vtVehicleComponent": ".?AVClientVehicleActorComponent@pa@@",
     "vtRodeoUi": ".?AVUIGamePlayControlRootMiniGameRodeo@uiCommonScript@pa@@",
+    "vtControlComponent": ".?AVClientCharacterControlActorComponent@pa@@",
 }
 
 # Each signature's bytes, and the target's distance from the first byte. The bytes before each site include the field
@@ -36,7 +37,17 @@ SIGNATURES = {
         "E8 ?? ?? ?? ?? 81 FB ?? ?? 00 00 73 ?? 8D 8B 7D FF FF FF 48 8D 1C CD 00 00 00 00 48 83 3C 03 00",
         0,
     ),
+    # ClientCharacterControlActorComponent's cached condition method, for types below 0x83.
+    "cachedCondition": (
+        "48 89 5C 24 10 57 48 83 EC 20 8B DA 48 8B F9 48 8B 41 08 48 8D 50 08 33 C9 48 85 C0 48 0F 44 D1 48 8B 12 "
+        "48 8D 4C 24 30 E8 ?? ?? ?? ?? 90 48 8D 05 ?? ?? ?? ?? 80 3C 03 01 74 ?? 48 8B 4F 08 E8 ?? ?? ?? ?? 84 C0 75 ?? "
+        "B3 02 EB ?? 48 8B 87 D0 00 00 00 0F B6 5C 18 08",
+        0,
+    ),
 }
+
+# How many vtable slots the mod searches for the cached condition method.
+CONTROL_VTABLE_SLOTS = 200
 
 # mov rax,[rip+x]; mov rcx,[rax+0x30]
 WORLD_REFERENCE = re.compile(rb"\x48\x8B\x05(....)\x48\x8B\x48\x30", re.DOTALL)
@@ -58,6 +69,9 @@ KNOWN = {
         "keyCheck": 0x3B0A30,
         "conditionTableCall": 0x3AAA7C,
         "physicsSlot": 0x2C0,
+        "vtControlComponent": 0x59459F0,
+        "cachedCondition": 0x3AA920,
+        "cachedConditionSlot": 77,
     },
     0x6AF5D198: {  # Steam build of 2026-11-13, not yet tested in game
         "vtActorManager": 0x59C2760,
@@ -70,6 +84,9 @@ KNOWN = {
         "keyCheck": 0x3B4090,
         "conditionTableCall": 0x3AE0CC,
         "physicsSlot": 0x2D0,
+        "vtControlComponent": 0x59C1660,
+        "cachedCondition": 0x3ADF70,
+        "cachedConditionSlot": 77,
     },
 }
 
@@ -205,6 +222,16 @@ def check(image, known):
         hits = image.find_all(signature_pattern(text), is_exec)
         listed = " ".join(f"{h + distance:#x}" for h in hits[:8])
         report(name, hits[0] + distance if len(hits) == 1 else None, f"{len(hits)} match(es): {listed}")
+
+    vtables = find_vtables(image, VTABLES["vtControlComponent"])
+    methods = image.find_all(signature_pattern(SIGNATURES["cachedCondition"][0]), is_exec)
+    slot = None
+    if len(vtables) == 1 and len(methods) == 1:
+        for i in range(CONTROL_VTABLE_SLOTS):
+            if struct.unpack_from("<Q", image.data, image.offset(vtables[0] + 8 * i))[0] - image.base == methods[0]:
+                slot = i
+                break
+    report("cachedConditionSlot", slot, "slot of cachedCondition in vtControlComponent")
     return ok
 
 

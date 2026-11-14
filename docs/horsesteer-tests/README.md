@@ -2,6 +2,21 @@
 
 Give each new test its own file, `stage-N.md`, with its steps and results, and add a row here.
 
+## Writing steps
+
+Holding W only keeps the mount at its current gait, and each Shift tap raises it one gait. A step that expects the mount
+to speed up again after a slowdown must say to tap Shift, not to hold W. Name gaits as the tester does:
+
+| Gait | Horse state | Horse `mount_value` |
+| --- | --- | --- |
+| Walk | `A56E` | 2.8 |
+| Trot | `B4A7` | 5.2 |
+| Canter | `C2B2` | 9.5 |
+| Gallop 1 | `D099` | 12 |
+| Gallop 2 | `E38E` | 14 |
+
+Holding Shift past gallop 2 is a mount skill that goes faster still for a while.
+
 ## Logs
 
 Tracing is off by default. Before a test, set `Logging=1` under `[Debug]` in `bin64\ProperHorseControls.ini`, or the test leaves no logs. DMM doesn't copy the ini from `DMM\mods`, so editing that copy has no effect. With `Logging=0`, `ProperHorseControls.log` only exists if the mod had a problem at startup, such as a failed lookup, and launching deletes the log and CSV from any earlier run. Up to stage 18 the files were named `HorseSteer.*`, which the notes below and the stage files still use.
@@ -33,6 +48,12 @@ From stage 37, the log adds a `lookup physicsSlot` line, a failed lookup reads `
 read 0.00 on every row, in stage 36 too, so don't use them.
 
 From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera detached` and `tap brake`. From stage 32, it adds `reload key`, and the log adds a `reloading settings` line before each `ini` line after the first. From stage 33, the log adds `suspended by` and `resumed by` lines with the owner and the number of owners holding. From stage 34, the `ini` line adds `key ramp`.
+
+From stage 38, the log adds `lookup cachedConditionSlot`, `mount condition 0xNN first read` lines and `T10` lines with
+the mount's `T10` answer, and the CSV ends with `t10`. From stage 39, setup logs `no input answer installed`, and `T10`
+lines read `T10 R game G`, the mod's answer and the game's. From stage 44, the log adds `step down start` and `step down
+end` lines, and `brake gap start` can have `source=no step`. From stage 45, it adds `hold input end` lines. The `gap
+read` lines of stages 40 to 42 and the `T167` lines of stage 43 are gone after stage 45.
 
 ## Tests
 
@@ -92,4 +113,12 @@ From stage 30, the `ini` line adds `deadzone`. From stage 31, it adds `camera de
 | [stage-35](stage-35.md) | A 100 ms minimum ramp from standing, with `KeyRampMs=0` | Passed on the horse. 0 of 11 same-row starts with W already read pivoted. The 3 pivots had A or D pressed first on purpose |
 | [stage-36](stage-36.md) | Steering bias settings at the defaults, 0 and 1, changed with Reload | Passed on the horse. Bias 0 didn't turn, bias 1 turned at 75°/s at a gallop against the defaults' 54°/s, and steering faded out between the speeds. A key deleted before a reload kept its old value, fixed and passed on re-run. `HighSpeed` below `LowSpeed` and a gamepad weren't run |
 | [stage-37](stage-37.md) | Game update `0x6AF5D198`: the wildcarded condition count and the `physicsSlot` lookup | Passed on the horse. Steering applied on 1,270 of 1,271 rows, the backward walk and brake gaps worked, and position speed matched velocity |
+| [stage-38](stage-38.md) | Probe logging the mount's `T10` results from slot 77, without changing them | Slot 77 answers `T10` on every mount tested, 0 when there's no move input. Sideways only and a slight push count as input |
+| [stage-39](stage-39.md) | Braking while turning, by answering `T10` for the mount during a slowdown instead of zeroing the stick | Failed. The chart flipped in and out of the slowing state every frame, from a canter and on the wolf. Gallop taps worked |
+| [stage-40](stage-40.md) | Probe logging every slot 77 read during a gap, with its caller and actor | Only the interpreter's entry check reads `T10` through slot 77. The check that sends the chart back doesn't |
+| [stage-41](stage-41.md) | Writing 0 to the mount's `T10` cache byte during a gap, as well as answering slot 77 | The write took, but canter and trot taps still flipped. The chart goes back up on `TE` |
+| [stage-42](stage-42.md) | Answering `TE` as not holding as well as `T10` as holding, during a gap | Passed on the horse and bear. One gait per tap on the horse, no flipping, and turning at the usual rate |
+| [stage-43](stage-43.md) | Probe logging the mount's `T167` reads, possibly the gear Shift selects | Not the gear: every read answered 0 all session, on six mounts |
+| [stage-44](stage-44.md) | One gait down per tap on non-horse mounts, by answering `T66` until the state changes | Alt taps passed on five mounts. S taps often went back up, because W and S together read as no input |
+| [stage-45](stage-45.md) | S taps on non-horse mounts, with move input answered until S is released | Passed on five mounts, the horse and wagon. One gait per S tap, and S holds still slow |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

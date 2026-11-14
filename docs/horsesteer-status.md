@@ -5,7 +5,7 @@ Where the land mount mod stands and what to do next. Requirements are in [discov
 
 ## Status
 
-`src/HorseSteer` (v1.3.2, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
+`src/HorseSteer` (v1.4.0, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
 and S alone walks the mount backward, on the horse and the 12 other mounts reached, with no setup. On the wagon, S
 reverses it through the game's brake key, and A or D steer as in the game. Tapping S with W held, the brake key or
 back on the stick slows any of them. The mod pauses during the taming minigame. `CameraDetached` and `TapBrake` under
@@ -27,8 +27,9 @@ with the page text in `mod_page/description.bbcode`. v1.1.0 adds the slowdown. I
 tagged `1.2.0` and packed as `build/ProperHorseControls-1.2.0.zip`. v1.3.0 adds `PHC_SetSuspended`. It's tagged `1.3.0`
 and packed as `build/ProperHorseControls-1.3.0.zip`, and is on Nexus. v1.3.1 adds `KeyRampMs` and the steering bias settings. It's
 tagged `1.3.1` and packed as `build/ProperHorseControls-1.3.1.zip`. v1.3.2 updates the mod for game update `0x6AF5D198`,
-with the changelog written. `DMM\mods\ProperHorseControls.asi` is the stage 37 build, which differs from v1.3.2 only in
-`kVersion`. The old
+with the changelog written. v1.4.0 adds braking while turning and one-gait drops on every mount. It's tagged `1.4.0`
+and packed as `build/ProperHorseControls-1.4.0.zip`. `DMM\mods\ProperHorseControls.asi` is v1.4.0's code, with the
+version string still 1.3.2. The old
 `HorseSteer.*` files are still in `DMM\mods` and `bin64`, so `HorseSteer` must stay off in DMM to avoid loading two
 copies.
 
@@ -36,25 +37,52 @@ DMM copies the zip's ini to `bin64` only when there's none, and keeps an existin
 missing setting at startup, so a release that adds settings needs no player steps. Check settings in
 `bin64\ProperHorseControls.ini`.
 
-**Next:** upload `build/ProperHorseControls-1.3.2.zip`. Then player reports and the
+**Next:** upload `build/ProperHorseControls-1.4.0.zip`. Then player reports and the
 next game update. After an update, run `tools/check_lookups.py` on the new exe.
+
+**Added in v1.4.0: braking while turning and one-gait drops.** In v1.3.2, braking while turning at a canter or above needed
+the brake key held, and S with A or D didn't slow at all, because the slowdown didn't start while steering. The working
+code fixes both, and drops every tested mount one gait per tap. It passed [stage 45](horsesteer-tests/stage-45.md) on
+the horse, bear, camel, wolf (keyboard and gamepad), battle boar, cucu bird and wagon, before the probe code was
+removed. How it works is in "Slowing a mount with S" below, and the path there, stages 38 to 45, is in
+`findings/charts-and-braking.md` (Slowing while steering). The cleaned build passed a check run on the horse and wolf
+(`scratch/probe-runs/release-1.4.0-check/`).
+
+- **Ruled out:** learning gaits as the mount is ridden, because players can't be asked to run through every gait
+  first, and `T167`, which isn't the gear ([stage 43](horsesteer-tests/stage-43.md)).
+- **Possible race:** in stages 40 and 41, a few `brake gap end` lines were logged twice, so `UpdateBrakeGap` may run on
+  two threads at once. Its statics aren't guarded. No effect seen.
+- **Chart extracts:** `scratch/out/charts-6AF5D198/` holds the charts for the current build, extracted 2026-11-14.
+  `scratch/out/charts/` predates the 2026-11-06 update. The branches cited for this work are the same in both, apart
+  from renumbered types.
 
 ## Slowing a mount with S
 
 Tapping S with W held, pulling the stick back, or pressing the game's brake key with forward input held slows the mount
-by writing 0 to the raw stick until the second consecutive change into a chart state whose value is 0 or missing, or
-until speed falls below 0.3 m/s, which passed [stage 29](horsesteer-tests/stage-29.md). The code is in `UpdateBrakeGap`, on every ground
-mount. Evidence is in `findings/charts-and-braking.md` (Slowing a mount with S), with tests in
-stages 21 to 29.
+by one gait, with steering held or not. The code is in `UpdateBrakeGap` and `OnCachedCondition`, which answers chart
+conditions for the mount through slot 77 of `ClientCharacterControlActorComponent`'s vtable.
+
+- **Horse and wagon, a slowdown:** `g_brakeGap` makes the chart read `T10` ("no move input") as holding and `TE` ("move
+  input") as not, until the second consecutive change into a chart state whose value is 0 or missing, or until speed
+  falls below 0.3 m/s. The stick is left as is, so steering carries on. If slot 77 isn't found, the slowdown zeroes the
+  stick instead, as in v1.3.2, and steering blocks it.
+- **Other mounts, a step down:** `g_stepDown` makes the chart read `T66` as holding until the state changes, and every
+  non-horse ride chart then moves to the gait below. `GroundMount::stepDown` marks these mounts. If there's no change
+  200 ms after the state's first 500 ms, the mount is at its lowest gait and the slowdown runs instead.
+- **S during a step down:** W with S, or a stick pulled back, reads as no move input. From a step down started by
+  either, `g_holdInput` makes the chart read move input until it's released, or for at most `kHoldInputMs` (500 ms) after
+  the step, so that holding S still slows the mount.
+
+Evidence is in `findings/charts-and-braking.md` (Slowing a mount with S, and Slowing while steering), with tests in
+stages 21 to 29 and 38 to 45. The notes below are from v1.1.0 to v1.3.2, when the slowdown zeroed the stick.
 
 - **Horse:** drops one gait, 48 of 48 taps in stage 21.
-- **Other mounts:** every other ride chart has one slowing node for all gaits, so a tap from the top gaits lands where
-  that chart lands (bear 5.2, camel 3.5). The tester accepted this over learning gaits at runtime.
+- **Other mounts:** every other ride chart has one slowing node for all gaits, so a tap from the top gaits landed where
+  that chart lands (bear 5.2, camel 3.5). The step down replaces this.
 - **Position write:** removed, with `AssistPerSecond`. It floated the horse and made the wagon's speed jump back up when
   it ended, for about a quarter off the bear's and camel's longest drops.
 - **S key:** read with `GetAsyncKeyState('S')`, which ignores rebinding, accepted until players report it.
 - **Stage 23:** passed on the horse, bear and wagon. The camel wasn't logged on this build.
-- **Limits accepted:** on non-horse mounts a tap lands where the chart lands, and the camel's 9.0 lands on 3.5.
 - **Brake key:** done, passed [stages 24](horsesteer-tests/stage-24.md) and [25](horsesteer-tests/stage-25.md).
   `BrakeKeyHeld` calls the key query, and Alt, mouse X2 and gamepad B all start the slowdown. Details are in
   `findings/charts-and-braking.md` (Slowing a mount with the brake key). If taps ever fail to drop a gait again, the

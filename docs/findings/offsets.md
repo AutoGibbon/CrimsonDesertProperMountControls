@@ -46,6 +46,30 @@ camera     = [[WorldSystem+0x18]+0x50]               the block the update copies
 - **Input state:** updated by `exe+0x30B3B50`, with the previous vector at `+0x38` and current at `+0x40`.
 - **`RideOn::Enter`:** `exe+0x74FBB0`.
 - **Chunk origin:** `exe+0x71AA150`. `HorseSteer` no longer reads it.
+- **Chart condition evaluation (`0x6AF5D198`, static):** the chart interpreter at `exe+0x2691BC5` sends condition types
+  below `0x83` to slot 77 (`+0x268`) of `ClientCharacterControlActorComponent`'s vtable, with the type in `edx`, and the
+  rest to slot 78 (`+0x270`).
+  - **The component:** the vtable is at `exe+0x59C1660` (`0x59459F0` on `0x6AED2E85`). The component is the context
+    that `OnKeyCondition` receives, and `[component+8]` is the actor.
+  - **Slot 77, `exe+0x3ADF70`** (`0x3AA920` on `0x6AED2E85`): returns the byte at `[component+0xD0] + 8 + type`, a cache
+    filled elsewhere. It does this if the type's byte in a flag table at `exe+0x5BCDB00` is 1, or if `exe+0x19979A0`
+    passes for the actor, and otherwise returns 2. Type `0x10`'s flag is 0.
+  - **Slot 78, `exe+0x3ADFF0`:** the handler-table dispatcher, so `key_brake` (`0xEA`) and `TC9` (`0xC9`) go through the
+    table that `InstallBrakeKey` patches. Types below `0x83` reach an error path there.
+  - **Overrides:** before either slot, the interpreter checks a list of overrides at `[rbp+0x10]`, gated by a global
+    byte at `exe+0x71D7A28`. Only types from `0x83` up to `0x288` can use it, through a jump table, so `T10` and `TE`
+    never do. Not traced further.
+  - **The interpreter:** starts at `exe+0x2691900` and recurses on tokens from `0x28B` up, which are probably `AND`,
+    `OR` and `NOT`. The stale chart extracts number those `0x287` to `0x289`, from before the type count rose by 4.
+    After either slot, it stores the type at `[rbp]`, the result at `[rbp+4]` and the counter at `[rbx]` at `[rbp+8]`.
+    Its slot 77 call returns to `exe+0x2691BE2`, the only caller logged during gaps in
+    [stage 40](../horsesteer-tests/stage-40.md).
+  - **Cache refresh:** the game rewrites `T10`'s cache byte about once a frame
+    ([stage 41](../horsesteer-tests/stage-41.md)).
+  - **Lookup:** `HorseSteer` finds the vtable by RTTI and slot 77 by `kCachedConditionSignature`, whatever `Logging` is
+    set to, from [stage 39](../horsesteer-tests/stage-39.md) on. `tools/check_lookups.py` checks both builds.
+  - **`T167`:** handler table slot `0x167 - 0x83`, reached through the same table as `key_brake`. With `Logging=1` the
+    [stage 43](../horsesteer-tests/stage-43.md) probe logs its handler's address.
 - **From other projects, not yet checked on this install:**
   - The image base is fixed at `0x140000000`, and part of the code is mutated by Denuvo, so some functions may only be
     readable in live memory (CrimsonDesertCoop).
