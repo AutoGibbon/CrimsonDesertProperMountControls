@@ -5,7 +5,7 @@ Where the land mount mod stands and what to do next. Requirements are in [discov
 
 ## Status
 
-`src/HorseSteer` (v1.4.0, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
+`src/HorseSteer` (v1.4.1, matching `mod_page/changelog.txt`) is the mod. Forward steering and free look work at walk, trot and gallop, S with A or D pivots,
 and S alone walks the mount backward, on the horse and the 12 other mounts reached, with no setup. On the wagon, S
 reverses it through the game's brake key, and A or D steer as in the game. Tapping S with W held, the brake key or
 back on the stick slows any of them. The mod pauses during the taming minigame. `CameraDetached` and `TapBrake` under
@@ -28,10 +28,9 @@ tagged `1.2.0` and packed as `build/ProperHorseControls-1.2.0.zip`. v1.3.0 adds 
 and packed as `build/ProperHorseControls-1.3.0.zip`, and is on Nexus. v1.3.1 adds `KeyRampMs` and the steering bias settings. It's
 tagged `1.3.1` and packed as `build/ProperHorseControls-1.3.1.zip`. v1.3.2 updates the mod for game update `0x6AF5D198`,
 with the changelog written. v1.4.0 adds braking while turning and one-gait drops on every mount. It's tagged `1.4.0`
-and packed as `build/ProperHorseControls-1.4.0.zip`. `DMM\mods\ProperHorseControls.asi` is a v1.4.1 work build: the key steering release ramp, and controls for the
-controlled character, including a follower, from `[[manager+0x58]+0xD8]`, which passed [stage 47](horsesteer-tests/stage-47.md).
-Holding the brake to stop on every mount ([hold-brake.md](hold-brake.md)) is next for v1.4.1.
-The old
+and packed as `build/ProperHorseControls-1.4.0.zip`. v1.4.1 adds the key steering release ramp, controls for the
+controlled character including a follower, and holding the brake to stop on every mount. It's tagged `1.4.1` and packed
+as `build/ProperHorseControls-1.4.1.zip`, and `DMM\mods\ProperHorseControls.asi` is that build. The old
 `HorseSteer.*` files are still in `DMM\mods` and `bin64`, so `HorseSteer` must stay off in DMM to avoid loading two
 copies.
 
@@ -39,7 +38,7 @@ DMM copies the zip's ini to `bin64` only when there's none, and keeps an existin
 missing setting at startup, so a release that adds settings needs no player steps. Check settings in
 `bin64\ProperHorseControls.ini`.
 
-**Next:** upload `build/ProperHorseControls-1.4.0.zip`. Then player reports and the
+**Next:** upload `build/ProperHorseControls-1.4.1.zip`. Then player reports and the
 next game update. After an update, run `tools/check_lookups.py` on the new exe and `tools/check_charts.py` on the
 game. The wagon's chart is `UNCHECKED` there, because CDMW can't decode the current one.
 
@@ -47,6 +46,16 @@ game. The wagon's chart is `UNCHECKED` there, because CDMW can't decode the curr
 the whole mod off, instead of running with parts missing. Today only the required lookups do that: `keyCheck`,
 `conditionTableCall`, the slot 77 lookup and the rodeo switch are optional, and their features fall back or drop out,
 such as the zeroed-stick slowdown when slot 77 isn't found.
+
+**Added in v1.4.1: follower riding, the steering release ramp and hold brake.**
+
+- **Follower riding:** `ResolveRide` takes the rider from `[[manager+0x58]+0xD8]`, which follows a switch to a follower,
+  and only the rider's and its mount's input is rewritten. Passed [stage 47](horsesteer-tests/stage-47.md).
+- **Release ramp:** releasing A or D eases steering back to straight over `KeyRampMs`.
+- **Hold brake:** on step-down mounts, holding the brake key, S with W, or the stick back steps down every gait to a
+  stop ([hold-brake.md](hold-brake.md)). Passed [stage 49](horsesteer-tests/stage-49.md).
+- **Race:** `UpdateBrakeGap` ran on two threads at once (stages 40, 41 and 48). In stage 48 this started a stray step
+  down alongside the `no step` slowdown. `RunBrakeGap` now runs it for the mount's input only, under a try-lock.
 
 **Added in v1.4.0: braking while turning and one-gait drops.** In v1.3.2, braking while turning at a canter or above needed
 the brake key held, and S with A or D didn't slow at all, because the slowdown didn't start while steering. The working
@@ -58,8 +67,6 @@ removed. How it works is in "Slowing a mount with S" below, and the path there, 
 
 - **Ruled out:** learning gaits as the mount is ridden, because players can't be asked to run through every gait
   first, and `T167`, which isn't the gear ([stage 43](horsesteer-tests/stage-43.md)).
-- **Possible race:** in stages 40 and 41, a few `brake gap end` lines were logged twice, so `UpdateBrakeGap` may run on
-  two threads at once. Its statics aren't guarded. No effect seen.
 - **Chart extracts:** `scratch/out/charts-6AF5D198/` holds the charts for the current build, extracted 2026-11-14.
   `scratch/out/charts/` predates the 2026-11-06 update. The branches cited for this work are the same in both, apart
   from renumbered types.
@@ -80,9 +87,12 @@ conditions for the mount through slot 77 of `ClientCharacterControlActorComponen
 - **S during a step down:** W with S, or a stick pulled back, reads as no move input. From a step down started by
   either, `g_holdInput` makes the chart read move input until it's released, or for at most `kHoldInputMs` (500 ms) after
   the step, so that holding S still slows the mount.
+- **Holding the brake:** on step-down mounts, once the input that started a step down has been held for `kHoldBrakeMs`
+  (500 ms), each gait change starts the next step down, down to the slowdown at the lowest gait. Released partway, the
+  mount stays at the gait it reached.
 
 Evidence is in `findings/charts-and-braking.md` (Slowing a mount with S, and Slowing while steering), with tests in
-stages 21 to 29 and 38 to 45. The notes below are from v1.1.0 to v1.3.2, when the slowdown zeroed the stick.
+stages 21 to 29, 38 to 45, 48 and 49. The notes below are from v1.1.0 to v1.3.2, when the slowdown zeroed the stick.
 
 - **Horse:** drops one gait, 48 of 48 taps in stage 21.
 - **Other mounts:** every other ride chart has one slowing node for all gaits, so a tap from the top gaits landed where

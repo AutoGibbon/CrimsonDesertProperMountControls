@@ -1,6 +1,9 @@
 # Holding the brake to stop on every mount
 
-Not started. A player report (gamepad, uses only the brake feature, no logs) said that on the horse, holding the brake
+Done in v1.4.1. Built as proposed below, with S held with W counting as a hold. Holds passed [stage 48](horsesteer-tests/stage-48.md), but taps chained. A hold now steps down the next gait only after
+`kHoldBrakeMs` (500 ms), which passed [stage 49](horsesteer-tests/stage-49.md). Releasing a hold partway leaves the mount
+at the gait it reached.
+A player report (gamepad, uses only the brake feature, no logs) said that on the horse, holding the brake
 stops it, but on other mounts only pressing it does. That matches the code and the charts.
 
 ## Current behaviour

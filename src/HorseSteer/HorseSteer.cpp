@@ -30,7 +30,7 @@
 
 namespace {
 
-constexpr const char* kVersion = "1.4.0";
+constexpr const char* kVersion = "1.4.1";
 
 // A code signature with ?? for bytes that vary, and the target's distance from its first byte, which must be literal.
 // tools/check_lookups.py runs the same lookups on saved exes, so change both together.
@@ -176,6 +176,9 @@ constexpr float kBrakeGapStopSpeed = 0.3f;
 // for, and otherwise slows the mount instead.
 constexpr ULONGLONG kStepDownStateMs = 500;
 constexpr ULONGLONG kStepDownWaitMs = 200;
+// Input that started a step down counts as held, and steps down the next gait, once it has been down this long, so that a
+// tap still down when the chart moves drops one gait only.
+constexpr ULONGLONG kHoldBrakeMs = 500;
 // After a step down from S or a stick pulled back, the chart keeps reading move input for at most this long while it's
 // held, so that holding it still slows the mount.
 constexpr ULONGLONG kHoldInputMs = 500;
@@ -893,7 +896,8 @@ bool BrakeKeyHeld() {
 //
 // On g_stepDownMount, a step down sets g_stepDown, so that the chart reads T66 and moves down one gait. It ends when the
 // chart state changes or the mount is below kBrakeGapStopSpeed. If the state hasn't changed kStepDownWaitMs after the
-// state's first kStepDownStateMs, there's no gait below, and a slowdown starts instead.
+// state's first kStepDownStateMs, there's no gait below, and a slowdown starts instead. Once the input that started a
+// step down has been held for kHoldBrakeMs, the next step down starts without a press, so that a hold steps down to a stop.
 //
 // A slowdown sets g_brakeGap, so that the chart reads no move input. It ends on the second consecutive change into a
 // chart state whose value is 0 or missing, below kBrakeGapStopSpeed, on steering, or after kBrakeGapMaxMs. A slowdown on
@@ -912,6 +916,11 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
     const bool sPressed = s && !sWas && KeyDown('W');
     const bool backwardPressed = backward && !backwardWas;
     const bool pressed = sPressed || backwardPressed || (brakePressed && forward);
+    const bool held = (s && KeyDown('W')) || backward || (brake && forward);
+    // Whether the input that started a step down is still held, so that the next gait's step down starts without a press.
+    static bool holdChain = false;
+    static ULONGLONG holdSince = 0;
+    if (!held) holdChain = false;
     brakeWas = brake;
     sWas = s;
     backwardWas = backward;
@@ -966,18 +975,22 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
         if (strcmp(reason, "no step") != 0) return false;
         // No gait below this one, so slow the mount instead.
         g_holdInput = false;
+        holdChain = false;
         startSlowdown("no step");
         return true;
     }
     if (!g_brakeGap.load()) {
-        if (!pressed || steering || speed < kBrakeGapMinSpeed || !haveState || value <= 0.0f ||
+        const bool chained = !pressed && holdChain && now - holdSince >= kHoldBrakeMs;
+        if (!(pressed || chained) || steering || speed < kBrakeGapMinSpeed || !haveState || value <= 0.0f ||
             g_backwardWalking.load()) {
             return false;
         }
-        const char* source = sPressed ? "S" : backwardPressed ? "stick" : "brake key";
+        const char* source = chained ? "hold" : sPressed ? "S" : backwardPressed ? "stick" : "brake key";
         if (ride.mount == g_stepDownMount.load() && g_cachedConditionRead) {
             g_stepDown = true;
-            if (sPressed || backwardPressed) {
+            if (!chained) holdSince = now;
+            holdChain = true;
+            if (sPressed || backwardPressed || (chained && (s || backward))) {
                 g_holdInput = true;
                 holdCap = 0;
             }
@@ -1007,6 +1020,16 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
     g_brakeGap = false;
     Log("brake gap end tick=%llu after=%llums speed=%.2f reason=%s", now, now - start, speed, reason);
     return false;
+}
+
+// Run UpdateBrakeGap for the mount's input only, one call at a time, because OnStickRead runs on more than one game
+// thread. Other calls return whether a slowdown or step down is running, without waiting.
+bool RunBrakeGap(const Ride& ride, uintptr_t inputActor, bool steering, bool backward, bool forward) {
+    static SRWLOCK lock = SRWLOCK_INIT;
+    if (inputActor != ride.mount || !TryAcquireSRWLockExclusive(&lock)) return g_brakeGap.load() || g_stepDown.load();
+    const bool running = UpdateBrakeGap(ride, steering, backward, forward);
+    ReleaseSRWLockExclusive(&lock);
+    return running;
 }
 
 // Adjust the player's or their mount's raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
@@ -1048,7 +1071,7 @@ void OnStickRead(SafetyHookContext& ctx) {
         UpdateBackwardPulse(false);
         UpdateBraking(false);
         // The stick's direction is relative to the camera here, so it says nothing about steering or backward input.
-        if (g_tapBrake.load() && UpdateBrakeGap(ride, false, false, std::hypot(stick[0], stick[1]) > 0.01f)) {
+        if (g_tapBrake.load() && RunBrakeGap(ride, inputActor, false, false, std::hypot(stick[0], stick[1]) > 0.01f)) {
             if (!g_cachedConditionRead) {
                 stick[0] = stick[1] = 0.0f;
                 SafeWrite(ctx.rdi + kInput_RawStick, stick, sizeof stick);
@@ -1080,8 +1103,9 @@ void OnStickRead(SafetyHookContext& ctx) {
     }
     // Answering T10 leaves the stick as is, so steering can carry on through the slowdown instead of blocking or ending it.
     const bool answerNoInput = g_cachedConditionRead != nullptr;
-    const bool gap = g_tapBrake.load() && UpdateBrakeGap(ride, !answerNoInput && std::fabs(stick[0]) > kBrakeGapSteerX,
-                                                         backward, stick[1] > 0.0f);
+    const bool gap = g_tapBrake.load() && RunBrakeGap(ride, inputActor,
+                                                      !answerNoInput && std::fabs(stick[0]) > kBrakeGapSteerX, backward,
+                                                      stick[1] > 0.0f);
     if (gap && !answerNoInput) {
         UpdateBackwardPulse(false);
         stick[0] = stick[1] = 0.0f;
