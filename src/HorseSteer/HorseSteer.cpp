@@ -245,7 +245,8 @@ SafetyHookMid g_stickHook;
 std::atomic<uintptr_t> g_groundMount{0};
 std::atomic<float> g_mountSpeed{0};
 std::atomic<int> g_steerSide{0};
-std::atomic<ULONGLONG> g_steerStart{0};
+std::atomic<float> g_steerRamp{0};
+std::atomic<ULONGLONG> g_steerTick{0};
 volatile uint64_t* g_rodeoCalls = nullptr;
 std::atomic<float> g_backwardRate{kBackwardRatePerSpeed};
 // Whether A and D curve the backward walk and the brake reverse the opposite way.
@@ -457,13 +458,17 @@ bool ReadVelocity(uintptr_t actor, float& x, float& z) {
     return sync && Read(sync + 0x188, x) && Read(sync + 0x190, z) && std::isfinite(x) && std::isfinite(z);
 }
 
-// Resolve the controlled actor, its mount through the vehicle component link, and the mount's facing.
+// Resolve the controlled actor, its mount through the vehicle component link, and the mount's facing. The controlled
+// actor is [[manager+0x58]+0xD8], which follows a switch to a follower, or [manager+0x50], which stays on Kliff, if it
+// can't be read.
 Ride ResolveRide() {
     Ride ride;
     const uintptr_t world = ReadPtr(g_base + g_worldSystemSlot);
     const uintptr_t manager = world ? ReadPtr(world + 0x30) : 0;
     if (!manager || !HasVtable(manager, g_vtActorManager)) return ride;
-    ride.rider = ReadPtr(manager + 0x50);
+    const uintptr_t control = ReadPtr(manager + 0x58);
+    ride.rider = control ? ReadPtr(control + 0xD8) : 0;
+    if (!ride.rider) ride.rider = ReadPtr(manager + 0x50);
     if (!ride.rider) return ride;
     const uintptr_t components = ReadPtr(ride.rider + 0x68);
     const uintptr_t vehicle = components ? ReadPtr(components + 0x48) : 0;
@@ -657,17 +662,29 @@ bool RidingGroundMount(const Ride& ride) {
            ride.mount == g_groundMount.load() && !RodeoActive();
 }
 
-// Return the milliseconds stickX has steered to one side, restarting when it starts steering or changes direction.
-float SteerHeldMs(float stickX) {
-    const int side = stickX > 0.01f ? 1 : stickX < -0.01f ? -1 : 0;
+// Return how far key steering has ramped in, from 0 to 1, and set side to the side it steers, or 0 once it has ramped
+// out. The ramp moves toward 1 over durationMs while stickX steers to side, and toward 0 over durationMs while stickX is
+// centred. Steering to the other side restarts it from 0, and analog steering clears it and returns 1.
+float UpdateSteerRamp(float stickX, bool digital, float durationMs, int& side) {
+    const int input = stickX > 0.01f ? 1 : stickX < -0.01f ? -1 : 0;
     const ULONGLONG now = GetTickCount64();
-    if (side != g_steerSide.exchange(side)) g_steerStart = now;
-    return static_cast<float>(now - g_steerStart.load());
-}
-
-// Return how far steering has ramped in over durationMs, from 0 to 1.
-float SteerRamp(float heldMs, float durationMs) {
-    return durationMs > 0.0f ? std::min(heldMs / durationMs, 1.0f) : 1.0f;
+    const float step =
+        durationMs > 0.0f ? static_cast<float>(now - g_steerTick.exchange(now)) / durationMs : 1.0f;
+    float ramp = g_steerRamp.load();
+    side = g_steerSide.load();
+    if (input != 0 && !digital) {
+        side = 0;
+        ramp = 0.0f;
+    } else if (input != 0) {
+        ramp = input == side ? std::min(ramp + step, 1.0f) : 0.0f;
+        side = input;
+    } else {
+        ramp = std::max(ramp - step, 0.0f);
+        if (ramp == 0.0f) side = 0;
+    }
+    g_steerSide = side;
+    g_steerRamp = ramp;
+    return input != 0 && !digital ? 1.0f : ramp;
 }
 
 // Return whether a raw stick reads like keys: each axis at 0 or full, or both axes equal and large, as on a diagonal.
@@ -778,7 +795,8 @@ void OnInputUpdate(SafetyHookContext& ctx) {
     sample.relative = relative * kRadToDeg;
 
     bool applied = false;
-    if (RidingGroundMount(ride) && ride.haveForward && g_cameraDetached.load()) {
+    const bool playerInput = actor != 0 && (actor == ride.rider || actor == ride.mount);
+    if (playerInput && RidingGroundMount(ride) && ride.haveForward && g_cameraDetached.load()) {
         applied = ApplyMountDirection(input, ride, sample);
     }
     sample.applied = applied;
@@ -991,11 +1009,12 @@ bool UpdateBrakeGap(const Ride& ride, bool steering, bool backward, bool forward
     return false;
 }
 
-// Adjust the raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
+// Adjust the player's or their mount's raw stick before the update reads it: clear backward input, leaving the backward walk to the position write,
 // and tighten forward steering. S alone starts the backward walk, and A or D during it steers. On g_brakeMount, S brakes
 // instead, which the chart takes as reverse, and A or D pass through as they do with the brake key. In both reverses,
 // g_backwardSteerInvert swaps A and D. Forward steering ramps in over g_keyRampMs, or at least kStandingRampMs from
-// standing, only for digital input, as an analog stick already moves gradually. During a UpdateBrakeGap slowdown, the
+// standing, and back out over the same time after A or D is released, only for digital input, as an analog stick
+// already moves gradually. During a UpdateBrakeGap slowdown, the
 // stick is zeroed only if OnCachedCondition isn't installed to answer T10, and with g_cameraDetached off that's the only
 // edit.
 void OnStickRead(SafetyHookContext& ctx) {
@@ -1009,12 +1028,13 @@ void OnStickRead(SafetyHookContext& ctx) {
         g_holdInput = false;
         return;
     }
+    uintptr_t inputActor = 0;
+    if (!Read(ctx.rdi + kInput_Actor, inputActor) || (inputActor != ride.rider && inputActor != ride.mount)) return;
     float velX = 0, velZ = 0;
     if (ReadVelocity(ride.mount, velX, velZ)) g_mountSpeed = std::hypot(velX, velZ);
     float stick[2];
     if (!SafeRead(ctx.rdi + kInput_RawStick, stick, sizeof stick)) return;
-    uintptr_t inputActor = 0;
-    if (Read(ctx.rdi + kInput_Actor, inputActor) && inputActor == ride.mount) {
+    if (inputActor == ride.mount) {
         g_rawStickX = stick[0];
         g_rawStickY = stick[1];
         g_mountInput = ctx.rdi;
@@ -1041,7 +1061,11 @@ void OnStickRead(SafetyHookContext& ctx) {
         std::atan2(std::fabs(stick[0]), -stick[1]) <= g_reverseDeadzone.load() * kHalfPi) {
         stick[0] = 0.0f;
     }
-    const float heldMs = SteerHeldMs(stick[0]);
+    const float speed = g_mountSpeed.load();
+    const float rampMs =
+        speed < kStandingSpeed ? std::max(g_keyRampMs.load(), kStandingRampMs) : g_keyRampMs.load();
+    int rampSide = 0;
+    const float ramp = UpdateSteerRamp(stick[0], digital, rampMs, rampSide);
     const bool backward = stick[1] < kBackwardStickY;
     const bool steering = std::fabs(stick[0]) > 0.01f;
     if (steering) LogStickKind(stick[0], stick[1], digital);
@@ -1078,11 +1102,13 @@ void OnStickRead(SafetyHookContext& ctx) {
         stick[1] = pulse ? 1.0f : 0.0f;
     } else if (stick[1] < 0.0f) {
         stick[1] = 0.0f;
-    } else if (stick[1] > 0.0f && steering) {
-        const float speed = g_mountSpeed.load();
-        const float rampMs =
-            speed < kStandingSpeed ? std::max(g_keyRampMs.load(), kStandingRampMs) : g_keyRampMs.load();
-        const float ramp = digital ? SteerRamp(heldMs, rampMs) : 1.0f;
+    } else if (stick[1] > 0.0f && (steering || (digital && rampSide != 0))) {
+        if (!steering) {
+            // Steer to the released key's side at the 45 degrees that W with A or D reads as, keeping the magnitude.
+            constexpr float kDiagonal = 0.70710678f;
+            stick[0] = static_cast<float>(rampSide) * stick[1] * kDiagonal;
+            stick[1] *= kDiagonal;
+        }
         TightenSteering(stick[0], stick[1], speed, ramp);
     } else {
         return;

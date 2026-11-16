@@ -1,3 +1,8 @@
+1.4.1
+Add: steer ramp to release when keyRampMs > 0 for improved steering feel on KBM. Result is mount will not snap to zero steering when release A/D, will use ramp ms to let return to forward direction.
+Fix: bug where mount controls break if you are riding a mount and are not Kliff/the main player actor.
+...(not finished yet) Improve: braking behaviour on special mounts. Now hold to brake and stop will slow mount to a stop.
+
 Version 1.4.0
 Improved tap braking behaviour on special mounts. Previous versions of the mod used simpler input driven methods to slow down mounts, but I had to go deeper and directly instruct their action charts. This way works much better and I have more control over mount state this way.
 Fixed tap braking while turning behaviour on all mounts. Technically a fix and an improvement in one.

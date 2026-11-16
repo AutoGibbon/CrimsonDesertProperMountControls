@@ -27,7 +27,8 @@ for new offsets, or port them with its `PORTING-3479.md` method using `scratch/e
 | `g_vtRodeoUi` | `0x5A75218` | RTTI | `UIGamePlayControlRootMiniGameRodeo` vtable; slot 47 runs each frame of the minigame |
 
 ```text
-manager    = [[g_worldSystemSlot]+0x30]              rider = [manager+0x50]
+manager    = [[g_worldSystemSlot]+0x30]              rider = [[manager+0x58]+0xD8], the controlled actor
+                                                     [manager+0x50] is Kliff even while a follower is controlled
 components = [actor+0x68]
 vehicle    = [components+0x48]                       mount key = [[vehicle+0x18]+0x10], seat = +0x14
 control    = [components+0x40]

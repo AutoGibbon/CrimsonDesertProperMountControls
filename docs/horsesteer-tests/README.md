@@ -121,4 +121,6 @@ read` lines of stages 40 to 42 and the `T167` lines of stage 43 are gone after s
 | [stage-43](stage-43.md) | Probe logging the mount's `T167` reads, possibly the gear Shift selects | Not the gear: every read answered 0 all session, on six mounts |
 | [stage-44](stage-44.md) | One gait down per tap on non-horse mounts, by answering `T66` until the state changes | Alt taps passed on five mounts. S taps often went back up, because W and S together read as no input |
 | [stage-45](stage-45.md) | S taps on non-horse mounts, with move input answered until S is released | Passed on five mounts, the horse and wagon. One gait per S tap, and S holds still slow |
+| [stage-46](stage-46.md) | Probe for the controlled actor after switching to a follower, by input census and pointer hunt | `[[manager+0x58]+0xD8]` follows each switch and not the mounts. Only the controlled character and its mount get input updates |
+| [stage-47](stage-47.md) | Controls on the controlled character's mount, including a follower's, from `[[manager+0x58]+0xD8]` | Passed. Controls followed every switch, on foot and mounted, and Kliff's horse got no input while the follower was controlled |
 | [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

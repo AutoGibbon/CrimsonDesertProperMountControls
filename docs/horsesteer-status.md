@@ -28,7 +28,9 @@ tagged `1.2.0` and packed as `build/ProperHorseControls-1.2.0.zip`. v1.3.0 adds 
 and packed as `build/ProperHorseControls-1.3.0.zip`, and is on Nexus. v1.3.1 adds `KeyRampMs` and the steering bias settings. It's
 tagged `1.3.1` and packed as `build/ProperHorseControls-1.3.1.zip`. v1.3.2 updates the mod for game update `0x6AF5D198`,
 with the changelog written. v1.4.0 adds braking while turning and one-gait drops on every mount. It's tagged `1.4.0`
-and packed as `build/ProperHorseControls-1.4.0.zip`. `DMM\mods\ProperHorseControls.asi` is the v1.4.0 release build.
+and packed as `build/ProperHorseControls-1.4.0.zip`. `DMM\mods\ProperHorseControls.asi` is a v1.4.1 work build: the key steering release ramp, and controls for the
+controlled character, including a follower, from `[[manager+0x58]+0xD8]`, which passed [stage 47](horsesteer-tests/stage-47.md).
+Holding the brake to stop on every mount ([hold-brake.md](hold-brake.md)) is next for v1.4.1.
 The old
 `HorseSteer.*` files are still in `DMM\mods` and `bin64`, so `HorseSteer` must stay off in DMM to avoid loading two
 copies.
