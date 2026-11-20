@@ -16,8 +16,10 @@ It finds its addresses at startup. Every lookup matched on the two game updates 
 `0x6AED2E85` (2026-11-06). On `0x6AF5D198` (2026-11-13), `conditionTableCall` failed because the condition type count
 went from `0x286` to `0x28A`, so the count is now a wildcard in the signature; the key slot is unchanged. The same update
 moved the physics object from `+0x2C0` to `+0x2D0`, which no lookup covered, so steering and the backward walk stopped
-working with every lookup passing. `g_physicsSlot` is now looked up. Copies of both exes are in `scratch/exe-baseline/`,
-and both builds are in `KNOWN` in `tools/check_lookups.py`. The fixes passed [stage 37](horsesteer-tests/stage-37.md).
+working with every lookup passing. `g_physicsSlot` is now looked up. The fixes passed
+[stage 37](horsesteer-tests/stage-37.md). On `0x6AFDC0CF` (2026-11-20), every static check passed and v1.4.1 works in
+game unchanged. Copies of all three exes are in `scratch/exe-baseline/`, and all three builds are in `KNOWN` in
+`tools/check_lookups.py`.
 
 ## Resume here
 
@@ -39,8 +41,7 @@ missing setting at startup, so a release that adds settings needs no player step
 `bin64\ProperHorseControls.ini`.
 
 **Next:** upload `build/ProperHorseControls-1.4.1.zip`. Then player reports and the
-next game update. After an update, run `tools/check_lookups.py` on the new exe and `tools/check_charts.py` on the
-game. The wagon's chart is `UNCHECKED` there, because CDMW can't decode the current one.
+next game update. After an update, follow the `game-update` skill.
 
 **Planned after the next update that causes a regression:** change the startup checks so that any failed check turns
 the whole mod off, instead of running with parts missing. Today only the required lookups do that: `keyCheck`,
