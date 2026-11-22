@@ -2,6 +2,7 @@
   "schema": 1,
   "updated": "2026-11-22",
   "facts": {
+    "game_dir": "Z:/SteamLibrary/steamapps/common/Crimson Desert",
     "exe_timestamp": "0x6AFDC0CF",
     "exe_seen": "2026-11-20",
     "exe_baselines": "../_shared/exe-baseline/ holds 0x6AED2E85, 0x6AF5D198 and 0x6AFDC0CF",
