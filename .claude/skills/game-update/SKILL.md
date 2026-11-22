@@ -26,8 +26,8 @@ Report what failed and what it breaks in game, then stop. Don't change the mod u
 
 | Failure | In game | Where to look |
 | --- | --- | --- |
-| Required lookup (`vt*` except `vtRodeoUi`, `worldSystemSlot`, `physicsSlot`, `hookSite`, `stickSite`) | `MOD INACTIVE` | Signature bytes in both exes with `tools/disasm.py`, then the porting route in `docs/findings/offsets.md` |
-| Optional lookup (`keyCheck`, `conditionTableCall`, `cachedCondition*`, `vtRodeoUi`) | That feature drops out; the mod stays active | As above. On `0x6AF5D198`, `conditionTableCall` failed because the condition type count changed |
+| Required lookup (`vtActorManager`, `vtVehicleComponent`, `vtRodeoUi`, `worldSystemSlot`, `physicsSlot`, `hookSite`, `stickSite`) | `MOD INACTIVE` | Signature bytes in both exes with `tools/disasm.py`, then the porting route in `docs/findings/offsets.md` |
+| Optional lookup (`keyCheck`, `conditionTableCall`, `vtControlComponent`, `cachedCondition*`) | That feature drops out; the mod stays active | As above. On `0x6AF5D198`, `conditionTableCall` failed because the condition type count changed |
 | `check_charts.py` | Braking flips in and out of slowing, or does nothing | `docs/findings/charts-and-braking.md`; `STEP_DOWN` must match `GroundMount::stepDown` in `HorseSteer.cpp` |
 | `check_fields.py` chain | A read returns a wrong pointer: no steering, a wrong mount, or no brake key | Disassemble use sites of the old and candidate offsets in both exes with `tools/disasm.py` |
 | `check_fields.py` rodeo slot | The mod doesn't pause in the taming minigame | Candidate slots it prints; `docs/findings/input-and-steering.md` |
@@ -41,8 +41,7 @@ still worked, while the true shift, the physics object from `+0x2C0` to `+0x2D0`
    timestamp in uppercase hex as in the existing names. Keep the older copies.
 2. Add the build to `KNOWN` in `tools/check_lookups.py` with the addresses it printed, commented
    `# Steam build of <date>, not yet tested in game`, and run step 1 again to confirm every line reads `ok`.
-3. Update the exe line under "Game state" in `docs/status.md`, and add the build to the paragraph on game updates in
-   `docs/horsesteer-status.md`.
+3. Set `exe_timestamp` and `exe_seen` under `facts` in `docs/state/environment.json`, and its `updated` date.
 4. Propose an in-game smoke test: `Logging=1` in `bin64\ProperHorseControls.ini`, ride the horse, and check that
    `bin64\ProperHorseControls.log` reaches `MOD ACTIVE: all features enabled.` If the user agrees, write it as a new test
-   in `docs/horsesteer-tests/`.
+   in `docs/horsesteer-tests/`, with a `planned` entry in `docs/state/tests.json`.
