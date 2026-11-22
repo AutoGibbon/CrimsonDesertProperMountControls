@@ -1,13 +1,17 @@
 # Input, steering and camera
 
-Build 1.0.0.3479. Addresses and field offsets are in [offsets.md](offsets.md).
+Addresses and field offsets are in [offsets.md](offsets.md).
 
 ## Game data
+
+Build 1.0.0.3479.
 
 - **Input:** `ui/inputmap.xml` binds `MoveAnalog` to the left stick and WASD as a plain 2D vector, with no coordinate
   frame setting. Remapping input cannot produce horse-relative movement.
 
 ## Ruled out
+
+Build 1.0.0.3479.
 
 - **`MoveControlOptionType` (`Classic`/`Standard`):** this appears in the horse chart, but patch 1.02.00 describes the
   setting as sprint input behaviour, not steering.
@@ -20,7 +24,7 @@ Build 1.0.0.3479. Addresses and field offsets are in [offsets.md](offsets.md).
 
 ## From HorseProbe run 1 and disassembly
 
-Logs are in `scratch/probe-runs/run1/`.
+Build 1.0.0.3479. Logs are in `scratch/probe-runs/run1/`.
 
 - **Update function:** slot 33 of the `ClientInputActorComponent` vtable, confirmed through RTTI, looks up the `MoveAnalog`
   input by name and copies the camera's forward and right vectors into the component.
@@ -56,6 +60,9 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
   right. v1.3.1 made the angles `LowSpeedBias` 0.89 and `HighSpeedBias` 0.61 (W+A's angle as a share of 90°), with the
   blend moved from 2.5–5.0 m/s to `LowSpeed` 2.2 and `HighSpeed` 4.8. Bias 0, 1 and a fade between were checked in
   [stage 36](../horsesteer-tests/stage-36.md). The 85° cap's reason wasn't recorded; it keeps some forward input.
+- **Keyboard steering, 1.1.0 against 1.3.0:** a player reported it slower in 1.3.0. Their logs
+  (`scratch/probe-runs/player-report-1110/`) show the 300 ms ramp working as designed, and the steering code is
+  identical across those versions, so there's no regression.
 
 - **Raw keyboard values (stage 14 to 15):** the raw stick at `+0x48` reads 0 or ±1 on each axis, including diagonals, such
   as (−1, 1) for W with A. `DigitalStick` treats those, and equal axes above 0.7, as keys, so the forward ramp skips a stick.
@@ -69,6 +76,8 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
 
 ## Taming minigame
 
+Build 1.0.0.3479.
+
 - **Input:** it needs input pointing at the mount's tail, and it reads the movement data the mod edits: holding S wins it
   with ease while backward input reaches the game. The package name can't separate wild horses from tamed ones.
 - **Rodeo signal:** slot 47 of `UIGamePlayControlRootMiniGameRodeo`'s vtable ran about 70 times a second during each minigame
@@ -76,3 +85,8 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
   mounting. The mod pauses while slot 47 is being called.
 
 The freeze after a win is in [stability.md](stability.md).
+
+## Open questions
+
+- **Game camera follow and lookahead:** stage 1 ran with both off, and steering with them on is untested. The game
+  itself runs normally with them on.

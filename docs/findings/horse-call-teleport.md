@@ -1,7 +1,8 @@
 # Horse call: teleport distance
 
-PE timestamp `0x6AF5D198`, from static analysis of `../_shared/exe-baseline/CrimsonDesert_6AF5D198.exe`. Not yet tested in game.
-Addresses are RVAs and are specific to this build.
+Static analysis of `../_shared/exe-baseline/CrimsonDesert_6AF5D198.exe`, PE timestamp `0x6AF5D198`. Addresses are RVAs
+specific to that build; on a later build, find them again with the last section. The open work is
+`horse-call-teleport-research` in [../state/tasks.json](../state/tasks.json).
 
 When the horse is called with H, it teleports to the player rather than pathfinding if it's farther away than a threshold. The
 threshold is very likely the `pa::GlobalVariableFloat` below, with a default of **64.0** (presumably metres).

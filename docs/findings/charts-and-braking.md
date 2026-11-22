@@ -1,19 +1,25 @@
 # Action charts, keys and braking
 
-Build 1.0.0.3479. `tools/chart_branches.py CDMW_SRC CHART_DIR` prints the horse chart's `key_brake` branches, the branches into
+`tools/chart_branches.py CDMW_SRC CHART_DIR` prints the horse chart's `key_brake` branches, the branches into
 the slide and drift states, and its skill conditions, with conditions decoded.
 
 ## Verified from game data
+
+Build 1.0.0.3479.
 
 - **Rotate events:** the horse chart has 76 unique `Rotate` frame events. Of 2,911 across all charts, 2,905 share the
   same header bytes, and no value there selects between camera, input and character frames.
 
 ## Hypotheses
 
+Build 1.0.0.3479.
+
 - `Rotate` events set turn rates and angle limits while native code supplies the target direction. This is inferred from
   values such as 6.98 rad/s and 180.
 
 ## Brake and drift
+
+Build 1.0.0.3479.
 
 - **`key_brake`:** bound to Alt, mouse X2 and gamepad B, in the same `CharacterAction` group that on-foot charts read, so S can't be
   added to it in `inputmap.xml`. The game's text describes it as "Drift ... while dashing". Most horse uses are `OR T10 key_brake`,
@@ -28,7 +34,8 @@ the slide and drift states, and its skill conditions, with conditions decoded.
   the brake answered on S, S with A or D drifted at 13–15 m/s, and turned at 70–85°/s with no drift at 11–12 m/s.
 - **Drift recovery:** many drifts fall to about 0 m/s within 2 s, then reach about 10 m/s by 6 s, even with W held. Speed fell
   below 3 m/s within 5 s in 6 of 17 Alt drifts with the mod on and 1 of 7 with it off, with W held about as long in both. The cause is
-  untraced.
+  untraced. Not a confirmed problem: the tester saw rougher recovery in stage 5 and suspects needing S to start the
+  drift made the escape inputs harder. Recheck only if it's still noticed with Alt.
 
 ## Slowing a mount with S
 
@@ -48,7 +55,7 @@ Constraints from the tester, for any S-based slowdown:
   mount in live play isn't practical. Anything scaled to a mount, such as a position write, must be derived from the
   current mount as it's ridden.
 
-Results from [stage 21](../horsesteer-tests/stage-21.md), on the horse:
+Results from [stage 21](../horsesteer-tests/stage-21.md), on the horse, on build `0x6AED2E85`:
 
 - **Raw stick:** W and S held together read 0 on `+0x48`, so the stick can't tell that from releasing W, and the horse
   stops as it does on a release. Detecting S during W needs a key read.
@@ -84,17 +91,17 @@ of a gallop stop.
 Every other ride chart has one slowing node for all gaits, from static charts and 1 to 5 logged stops per mount. The
 elephant has no logged stops. The charts have 40 to 50 nodes, against the horse's 281.
 
-| Chart | Slowing node | Exits below, m/s |
-| --- | --- | --- |
-| Bear | `#39` | 4.5 |
-| Camel | `#28` | 5.0 |
-| Warthog | `#37` | 5.0 |
-| Wolf | `#17` | 5.0 |
-| Reindeer | `#9` | 3.0 |
-| Elephant | `#20` | 3.0 |
-| Carma bird | `#36` | 4.0 |
-| Cucu bird | `#39` | 3.5 |
-| Iguana | `#7` | 2.5 |
+| Chart      | Slowing node | Exits below, m/s |
+| ---------- | ------------ | ---------------- |
+| Bear       | `#39`        | 4.5              |
+| Camel      | `#28`        | 5.0              |
+| Warthog    | `#37`        | 5.0              |
+| Wolf       | `#17`        | 5.0              |
+| Reindeer   | `#9`         | 3.0              |
+| Elephant   | `#20`        | 3.0              |
+| Carma bird | `#36`        | 4.0              |
+| Cucu bird  | `#39`        | 3.5              |
+| Iguana     | `#7`         | 2.5              |
 
 The landing gait doesn't follow from the exit speed: the bear's 4.5 lands on 5.2, and the camel's 5.0 lands on 3.5.
 
@@ -112,7 +119,8 @@ From [stage 24](../horsesteer-tests/stage-24.md) and [stage 25](../horsesteer-te
   With two consecutive changes needed, 18 of 18 dropped one gait, 5 of them after a bounce.
 - **Slope:** not what separates them. All 7 failures were downhill, but so were 11 of the 15 taps that worked, including
   the two steepest.
-- **Hold:** W and Alt held brought the horse to a stop. The camel slowed but didn't fully stop, which the tester accepted.
+- **Hold, before the step down:** W and Alt held brought the horse to a stop. The camel slowed but didn't fully stop.
+  Holding now steps non-horse mounts down to a stop ([slowdown.md](../slowdown.md)).
 - **Drift:** Alt with A or D, and Alt followed by A or D, still drift. All 7 steering presses logged had W released, so
   a press with W and a steering key already held was never logged.
 
@@ -145,8 +153,8 @@ Constraints from the tester for any fix:
   mounts whose charts don't read `key_brake`. If the mod can answer `T10` and `TC9` itself (below), the chart makes its
   own transitions and the position write shouldn't be needed.
 
-**Fix to explore: answer `T10` as true for the mount** from the press until the next slowing state, with the stick left
-as is, so steering continues. `key_brake` and drift are untouched.
+**The fix answers `T10` as true for the mount** from the press until the next slowing state, with the stick left as
+is, so steering continues, and `TE` as not holding (below). `key_brake` and drift are untouched.
 
 - **Other mounts:** every ride chart enters its slowing node through `T10`. From the action charts, each gait node of the
   bear, camel, warthog, wolf, reindeer, elephant, iguana and both birds branches on `T10` to a node without a clip. That
@@ -200,7 +208,7 @@ as is, so steering continues. `key_brake` and drift are untouched.
 - **One-gait drops on other mounts:** `T10` gets them into their slowing node, but they still leave it at the node's
   fixed `TC9` speed. Answering that `TC9` as true at the next gait's speed, while the chart is in the slowing node, could
   make them leave one gait down. `TC9` is type `0xC9`, so it goes through the handler table `InstallBrakeKey` patches.
-  This isn't designed or tested.
+  This wasn't tried: the `T66` step down does it instead ([slowdown.md](../slowdown.md)).
 
 - **Encoding ([stage 38](../horsesteer-tests/stage-38.md)):** slot 77 returns 0 when `T10` holds and 1 otherwise, and
   `T10` is "no move input". Any stick input counts, including x alone and a sent y of 0.03. The horse, bear, camel and
@@ -220,14 +228,13 @@ as is, so steering continues. `key_brake` and drift are untouched.
   the mod bounces. [Stage 42](../horsesteer-tests/stage-42.md) answered `TE` as not holding during a gap as well, and
   passed on the horse and bear: no flipping, one gait per tap on the horse, and turning at the usual 52 to 74°/s.
 
-To check, in order, once the chart stays in the slowing state:
-
-1. Whether a mount keeps turning in its slowing node with x held. Mod-off Alt with A suggests the horse does.
-2. Whether on-foot charts use `T10`. The answer would be limited to the mount actor, as `OnKeyCondition` does.
-
-If it works, it replaces the gap's zeroed stick on every mount, horse included.
+A mount keeps turning in its slowing node with x held (stage 42). The answer is limited to the mount actor, as
+`OnKeyCondition` does, so whether on-foot charts use `T10` doesn't matter. It replaces the gap's zeroed stick on every
+mount, horse included, whenever slot 77 is found.
 
 ## Reading and overriding keys
+
+Build 1.0.0.3479, unless a bullet names another.
 
 - **Key check:** `exe+0x3B0150` is the handler for condition type `0xEA`. The handler table comes from `exe+0x3A9FC0`, at index
   `type - 0x83`. The handler reads the key hash from the condition at `+8` and the actor from the context at `+8`. `key_brake`'s
@@ -236,16 +243,18 @@ If it works, it replaces the gap's zeroed stick on every mount, horse included.
   on S started drifts in game. Replacing the table slot worked alongside the existing hook. That code was removed with the brake and is saved in
   `scratch/probe-runs/stage5-brake/s-brake.patch`.
 - **Condition table on later builds:** the getter is Denuvo-mutated on every build, so `HorseSteer` finds it through
-  a call in the condition dispatcher, `g_conditionTableCall`, which also checks the type is below `0x286`. On build
+  a call in the condition dispatcher, `g_conditionTableCall`, which also checks the type is below the condition type
+  count. The count is `0x286` up to `0x6AED2E85` and `0x28A` on `0x6AF5D198`, so the signature has a wildcard for it.
+  On build
   `0x6AEB7D59` the getter is `0x3AA5C0` and the key handler `0x3B0750`. Replacing the slot works there alongside the
   other mod's hook, and on the wagon the actor at the context's `+8` is the wagon ([stage 15](../horsesteer-tests/stage-15.md)).
 - **Installed mods:** Combat Evolved swaps riding charts such as `ride_upper` and `ride_weapon_upper`, and its strings show
-  no movement or steering code. It logs a game key check at `exe+0x3B0150` on this build, which may help with reading
+  no movement or steering code. It logs a game key check at `exe+0x3B0150` on build 1.0.0.3479, which may help with reading
   game input.
-- **Key query (Horse Tap Brake, checked against this build's exe):** the signature has one match, `exe+0x30C5640`, which takes a
+- **Key query (Horse Tap Brake, checked against build 1.0.0.3479's exe):** the signature has one match, `exe+0x30C5640`, which takes a
   key hash and returns true if the key is held. It's slot 8 of the input object's vtable. That object comes from the first entry
   of the list at `[[WorldSystem+0xD8]+0x20]` (count at `+0x28`), then `+0x10`.
-- **Key hash (Horse Tap Brake, checked against this build's exe):** Jenkins lookup3 with seed `0xC5EDE` on the lowercase name,
+- **Key hash (Horse Tap Brake, checked against build 1.0.0.3479's exe):** Jenkins lookup3 with seed `0xC5EDE` on the lowercase name,
   which reproduces the `key_brake` hash above. The mod overrides the result of the slot 8 call to hold a key, so the
   `0xEA` handler table doesn't need patching. This only covers actions read through that query, so it can't replace the stick
   changes.

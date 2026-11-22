@@ -1,6 +1,7 @@
 # HorseSteer tests
 
-Give each new test its own file, `stage-N.md`, with its steps and results, and add a row here.
+Give each new test its own file, `stage-N.md`, with its steps and results, and add an entry to
+[../state/tests.json](../state/tests.json), which holds every test's status and result.
 
 ## Writing steps
 
@@ -55,74 +56,3 @@ lines read `T10 R game G`, the mod's answer and the game's. From stage 44, the l
 end` lines, and `brake gap start` can have `source=no step`. From stage 45, it adds `hold input end` lines. The `gap
 read` lines of stages 40 to 42 and the `T167` lines of stage 43 are gone after stage 45.
 
-## Tests
-
-| Test | Checks | Result |
-| --- | --- | --- |
-| [stage-1](stage-1.md) | Forward steering and free look | Passed |
-| [stage-2](stage-2.md) | S as a brake, horse-only check | Failed: the check switched the mod off, so the other steps weren't run |
-| [stage-2b](stage-2b.md) | Steering restored, mount scan, S | Steering good. S felt no different from releasing W |
-| [stage-3](stage-3.md) | Land-mount check, tighter steering | Passed. W with A or D at the same moment could stick in a pivot, and steering felt instant |
-| [stage-4](stage-4.md) | Steering ramp | Passed |
-| [stage-5](stage-5.md) | S brake, backward clips | S brake abandoned. The clip test crashed during loading |
-| [stage-5b](stage-5b.md) | Clips through a JSON patch | Clips played, but the horse didn't move |
-| [stage-5c](stage-5c.md) | Move speed data on the backward loop | No movement |
-| [stage-5d](stage-5d.md) | Same, with a key held | No movement |
-| [stage-5e](stage-5e.md) | Fixed patch field | No movement |
-| [stage-5f](stage-5f.md) | Moving the horse from the mod | Smooth and stops at walls, but too fast for the clips |
-| [stage-5g](stage-5g.md) | Slower movement, restored clip data | Good match on clip 2. Also found a backward walk that plays by itself |
-| [stage-5h](stage-5h.md) | That backward walk without the test chart | Loops once started, but the timing window is small |
-| [stage-5i](stage-5i.md) | Forward pulse to start the walk | Nearly always works from standing, not from a walk or trot |
-| [stage-5j](stage-5j.md) | Slow down first, then start | Works from all gaits. Steering in reverse looked clunky |
-| [stage-5k](stage-5k.md) | Later start, smaller reverse steering | Good |
-| [stage-6](stage-6.md) | Final backward walk (v0.0.1) | Passed. Taming minigame and other mounts not tested |
-| [stage-7](stage-7.md) | New addresses after the game patch | Passed. Taming minigame not tested |
-| [stage-8](stage-8.md) | Logging the mount's chart state and velocity | Passed. Velocity is usable as speed, and the state during a freeze was logged |
-| [stage-9](stage-9.md) | Speed from velocity | Passed, except that releasing A or D in reverse usually slid instead of returning to the walking animation. Velocity wasn't the cause (stage 9c) |
-| [stage-9b](stage-9b.md) | Reverse steering release with position speed put back, on flat ground | Passed: 14 of 14 releases in the log returned to the walking animation |
-| [stage-9c](stage-9c.md) | The same with velocity restored, to separate the speed change from the ground | Velocity isn't the cause: 15 of 15 releases returned to the walking animation. One state drop at a grade of about +0.5, with no release involved, lasted until S was released |
-| [stage-9d](stage-9d.md) | Forward pulse when the chart state leaves the walk during the backward walk | Passed. Both state drops at about 1 m/s recovered with no forward movement. Another 19 pulses fired while the horse was stopped by a wall or object, with no problem noticed |
-| [stage-10](stage-10.md) | Addresses found at startup, with riding, backward walk and taming | Passed. All lookups matched in live memory, and the rodeo switch worked. Of two tames, only the one with keys pressed before the UI closed moved afterward |
-| [stage-10b](stage-10b.md) | A failed lookup leaves the mod idle, and the post-win freeze with no hooks | Passed: the log named the failed lookup, and the game played as unmodded. The freeze check was inconclusive: one tame moved, but the tester wasn't sure the keys were released in time |
-| [stage-11](stage-11.md) | Controls and backward walk on each ground mount, with mount identity logging | Horse passed. Camel and reindeer untested: `ReadPackageName` failed on them, so the mount check left the mod inactive |
-| [stage-11b](stage-11b.md) | Memory scan of each mount for a name that works, and the stage 11 steps with a key that forces the controls on | Passed on all 9 non-horse mounts reached, with End. Scans found the package at `+0x18`. Elephant and cucubird not reached |
-| [stage-12](stage-12.md) | Mounts recognised without End, speeds from `HorseSteer.ini`, and a pulse when A or D is released in reverse | Recognition, the `.ini` and speeds passed on 13 mounts, with no lurch. Mounts still lost the backward walk and slid, so the pulse was replaced |
-| [stage-12b](stage-12b.md) | Pulses when the mount's chart value goes missing during the backward walk | Passed on the camel, boar, cucubird, reindeer and horse: slides ended within 0.4 s, with no lurch, including at walls. Cucubird gliding also steers correctly |
-| [stage-13](stage-13.md) | Controls and backward walk with the test keys removed | Passed on the horse and iguana |
-| [stage-14](stage-14.md) | Controls and backward walk on wagons | Passed. Reverse steering was poor, as with the game's brake key |
-| [stage-15](stage-15.md) | S as the wagon's brake reverse, reverse steering ramp | Brake reverse passed. The ramp delayed the horse's reverse steering by about 0.44 s, so it was removed |
-| [stage-16](stage-16.md) | Finding the animal pulling the wagon and logging its angle, and the horse's reverse steering without the ramp | Animal found, but its physics reads as the wagon's, so no angle. Short taps in reverse turn the wagon 9 to 18° and then reverse straight. Horse steers at once |
-| [stage-17](stage-17.md) | Rotations around the wagon and its animal, for the animal's angle to the wagon | No rotation in the scanned memory showed an angle between the animal and the wagon. Every one that moved followed the root heading |
-| [stage-18](stage-18.md) | Horse's state recovery pulse limited to above 0.3 m/s | Passed. Contact jitter against objects can still pass the limit, unnoticed in play |
-| [stage-19](stage-19.md) | Shift+F5 removed, `Toggle` key setting, `InvertSteer` on the horse, another mount and the wagon | Passed on the horse and wagon. The tester prefers `InvertSteer=1` |
-| [stage-20](stage-20.md) | Missing ini settings added with defaults at startup | Passed, run with no ini: the mod wrote every setting |
-| [stage-21](stage-21.md) | W+S raw stick, gait after a stick gap, and a position write against forward motion | W+S reads 0. On the horse, a stick gap dropped one gait in 48 of 48 taps. The position write reached at most 1.1 m/s, and only ran during the gap. On the bear and camel, taps from high gaits landed two or three gaits down |
-| [stage-22](stage-22.md) | Ending a stick gap at the next lower gait's speed, on the bear and camel, with and without the position write | Bear: 12 of 12 taps landed one gait lower. Camel: 3.5 to 2.6 worked, but 9.0 landed on 3.5. The lowest gait still runs to the 3 s cap. Feet looked fine with the write |
-| [stage-23](stage-23.md) | Tap and hold of S to slow every ground mount, the `[Slowdown]` setting, and the position write on longer drops | Passed on the horse, bear and wagon. No camel ride was logged |
-| [stage-24](stage-24.md) | The game's brake key starting the slowdown, with drift kept | Passed on the horse, camel and wagon, and drift kept, except that 7 of 22 horse taps from 5.2 to 12 kept their gait when the chart bounced out of the slowing state |
-| [stage-25](stage-25.md) | Brake key taps on the horse, needing two consecutive slowing states | Passed. 18 of 18 taps from 5.2 to 12 dropped one gait, 5 of them after a bounce |
-| [stage-26](stage-26.md) | The slowdown on the wagon, from S and the brake key at every speed | Passed, slowing from every speed with no jitter. Taps from 5.5 ran to the 3 s cap at about 1 m/s. With Shift held at top speed a tap does little |
-| [stage-27](stage-27.md) | A wagon tap at cruise ending below 5 m/s instead of on the time cap | Cruise passed, ending in 0.2 to 0.44 s. Taps from top speed lurched, jumping up to 2 m/s when the position write ended |
-| [stage-28](stage-28.md) | Wagon taps with the position write skipped | Passed. No lurch, and top-speed taps took about 1.5 s. The position write was then removed for every mount |
-| [stage-29](stage-29.md) | A slowdown ending once the mount is below 0.3 m/s | Passed on the bear. No time cap in 8 taps, and 2 ended on the new check |
-| [stage-30](stage-30.md) | `StickDeadzone`: a gamepad pulled back slightly off center walking backward instead of spinning | Passed on the horse. Straight pulls had no yaw change and 5 stick taps each dropped a gait. The wagon wasn't run |
-| [stage-31](stage-31.md) | `CameraDetached` and `TapBrake` feature flags in each new combination | Passed on the horse. 23 slowdowns with camera-relative input, 22 dropping one gait |
-| [stage-32](stage-32.md) | The `Reload` key reading the ini while the game runs | Not run |
-| [stage-33](stage-33.md) | `PHC_SetSuspended` from a test caller, with two owners and the toggle | Passed on the horse. A backward walk from standing after a resume wasn't run, only one resumed with S held |
-| [stage-34](stage-34.md) | `KeyRampMs` at 0 and 50 ms: standing W+A starts and gallop steering | Response as expected. At 0, 2 of 3 standing starts stuck turning on the spot in `9884`. At 50, 1 of 7 same-row starts did, and 3 of 4 with A or D a row before W, which the tester accepts |
-| [stage-35](stage-35.md) | A 100 ms minimum ramp from standing, with `KeyRampMs=0` | Passed on the horse. 0 of 11 same-row starts with W already read pivoted. The 3 pivots had A or D pressed first on purpose |
-| [stage-36](stage-36.md) | Steering bias settings at the defaults, 0 and 1, changed with Reload | Passed on the horse. Bias 0 didn't turn, bias 1 turned at 75°/s at a gallop against the defaults' 54°/s, and steering faded out between the speeds. A key deleted before a reload kept its old value, fixed and passed on re-run. `HighSpeed` below `LowSpeed` and a gamepad weren't run |
-| [stage-37](stage-37.md) | Game update `0x6AF5D198`: the wildcarded condition count and the `physicsSlot` lookup | Passed on the horse. Steering applied on 1,270 of 1,271 rows, the backward walk and brake gaps worked, and position speed matched velocity |
-| [stage-38](stage-38.md) | Probe logging the mount's `T10` results from slot 77, without changing them | Slot 77 answers `T10` on every mount tested, 0 when there's no move input. Sideways only and a slight push count as input |
-| [stage-39](stage-39.md) | Braking while turning, by answering `T10` for the mount during a slowdown instead of zeroing the stick | Failed. The chart flipped in and out of the slowing state every frame, from a canter and on the wolf. Gallop taps worked |
-| [stage-40](stage-40.md) | Probe logging every slot 77 read during a gap, with its caller and actor | Only the interpreter's entry check reads `T10` through slot 77. The check that sends the chart back doesn't |
-| [stage-41](stage-41.md) | Writing 0 to the mount's `T10` cache byte during a gap, as well as answering slot 77 | The write took, but canter and trot taps still flipped. The chart goes back up on `TE` |
-| [stage-42](stage-42.md) | Answering `TE` as not holding as well as `T10` as holding, during a gap | Passed on the horse and bear. One gait per tap on the horse, no flipping, and turning at the usual rate |
-| [stage-43](stage-43.md) | Probe logging the mount's `T167` reads, possibly the gear Shift selects | Not the gear: every read answered 0 all session, on six mounts |
-| [stage-44](stage-44.md) | One gait down per tap on non-horse mounts, by answering `T66` until the state changes | Alt taps passed on five mounts. S taps often went back up, because W and S together read as no input |
-| [stage-45](stage-45.md) | S taps on non-horse mounts, with move input answered until S is released | Passed on five mounts, the horse and wagon. One gait per S tap, and S holds still slow |
-| [stage-46](stage-46.md) | Probe for the controlled actor after switching to a follower, by input census and pointer hunt | `[[manager+0x58]+0xD8]` follows each switch and not the mounts. Only the controlled character and its mount get input updates |
-| [stage-47](stage-47.md) | Controls on the controlled character's mount, including a follower's, from `[[manager+0x58]+0xD8]` | Passed. Controls followed every switch, on foot and mounted, and Kliff's horse got no input while the follower was controlled |
-| [stage-48](stage-48.md) | Holding the brake key, S with W, or the stick back on non-horse mounts steps down every gait to a stop | Holds passed. 13 taps still down when the gait changed went on to drop more gaits |
-| [stage-49](stage-49.md) | Holds step down only after 500 ms, and `UpdateBrakeGap` runs for the mount's input only | Passed on two mounts and the horse. Taps drop one gait, holds stop, and a hold released early drops two or three gaits, kept as a feature |
-| [taming-minigame](taming-minigame.md) | Controls with the mod paused | Controls normal. The horse won't move after a win until a remount, a known issue |

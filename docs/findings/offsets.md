@@ -1,6 +1,6 @@
 # Offsets and addresses
 
-Steam build 26423880, PE timestamp `0x6AEA07A6`. All values are offsets from the image base unless shown as a field of a chain. What they
+All values are offsets from the image base unless shown as a field of a chain. What they
 do is explained in the topic files.
 
 `HorseSteer` finds the addresses below at startup and logs them. If a required lookup fails, it installs no hooks. `tools/check_lookups.py EXE...` runs the same lookups on saved exes and compares them with each build's known addresses in `KNOWN`. Change the tool and the mod together. The chart condition numbers the mod answers (`T10`, `TE`, `T66`) and the charts it relies on are checked by `tools/check_charts.py`, which the mod's `GroundMount::stepDown` list must match.
@@ -14,7 +14,8 @@ for new offsets, or port them with its `PORTING-3479.md` method using `../_share
 
 ## Used by `HorseSteer` and working in game
 
-[stage-10](../horsesteer-tests/stage-10.md) found all of these in live memory on this build, and tested them in game, including the rodeo slot.
+Addresses are from Steam build 26423880, PE timestamp `0x6AEA07A6`; `KNOWN` in `tools/check_lookups.py` has each
+later build's. [stage-10](../horsesteer-tests/stage-10.md) found all of these in live memory on that build, and tested them in game, including the rodeo slot.
 
 | Variable in `HorseSteer.cpp` | Address | Lookup | What it is |
 | --- | --- | --- | --- |
@@ -44,6 +45,8 @@ camera     = [[WorldSystem+0x18]+0x50]               the block the update copies
 `+0x154`, camera right `+0x160`.
 
 ## Traced in the exe
+
+Steam build 26423880, unless an item names another.
 
 - **`ClientInputActorComponent`:** vtable `0x59564C0`, update at slot 33, `exe+0xB6D470`. Angle calculation at `exe+0xB6CDB0`.
 - **Input state:** updated by `exe+0x30B3B50`, with the previous vector at `+0x38` and current at `+0x40`.
@@ -89,7 +92,7 @@ Its author gave written permission on 2026-11-08 to use its core feature in this
 
 How a tap works, from the disassembly: on a press of `Key_Brake`, the slot 8 hook answers the key as held until the second change into a `mount_value` 0 state, for at most `TapMaxMs` (1500), or for `TapConfirmMs` (300) if no such state appears. The hook has no actor or steering check. Its timings match the chart's slowing chain, but a tap at a walk needs 1.8 to 2.0 s, longer than the cap. The bear and camel charts have no `key_brake` branches, and the wolf and warthog have one each, at a walk.
 
-Checked against this build's exe:
+Checked against build 26423880's exe:
 
 - **Vtable:** RTTI finds `NormalMovementMethod`'s vtable at `exe+0x5958C10`. Slots 4, 5 and 6 are all the empty stub `exe+0x3A3450`.
 - **World global:** counting references to `mov rax,[rip+x]; mov rcx,[rax+0x30]` in code gives `g_worldSystemSlot` with 204 references, against 21 for the next.

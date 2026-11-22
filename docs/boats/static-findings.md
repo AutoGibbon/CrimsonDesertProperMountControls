@@ -1,6 +1,6 @@
 # Boats: findings from game files
 
-Nobody has sailed a ship for this project yet. Everything here comes from the installed files, with DLC `dlc_01`
+Everything here comes from the installed files, not from play, with DLC `dlc_01`
 (Charting the Unknown) installed, on exe PE timestamp `0x6AED2E85`. Record what happens in game in the last column of
 [Predictions to check in game](#predictions-to-check-in-game).
 

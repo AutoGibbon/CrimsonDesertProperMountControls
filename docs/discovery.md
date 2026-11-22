@@ -17,7 +17,8 @@ Replicate Red Dead Redemption 2's horse-relative controls, through a native ASI 
   and releasing W while steering at speed gives a tighter turn. The user wants to keep both behaviours.
 - **Pivot:** S with A or D turns the horse nearly on the spot, at about 52°/s and 0.5 m/s, and the user wants to keep it.
 - **Camera:** looking around freely never changes the horse's course.
-- **Input:** keyboard and mouse. Controller support is optional for now.
+- **Input:** keyboard and mouse, and gamepad. Gamepad users are never worse off: the stick pulled back works wherever S
+  does.
 - **Mounts:** a public release needs every legged ground mount to work. Carriages should get similar controls if possible. The exosuit/mech suit is excluded.
 
 ## Done when
@@ -29,13 +30,8 @@ Replicate Red Dead Redemption 2's horse-relative controls, through a native ASI 
 
 `src/HorseSteer` hooks `ClientInputActorComponent`'s per-frame update while the player is mounted, and replaces its copied
 camera forward and right vectors with ones aligned to the mount. The game's own angle calculation then resolves WASD
-against the mount's facing, so the camera stays free. Test status is in `docs/horsesteer-tests/README.md`.
-
-Open points:
-
-- **Drift recovery:** not a confirmed problem. The tester saw rougher recovery in stage 5 and suspects needing S to start the drift made the escape inputs harder. Removing S as the trigger should remove that factor; recheck only if it's still noticed with Alt.
-- **Mount check:** the action package name must be in `g_groundMounts`. `ReadPackageName` reads the name at `+0x18`, which worked on all 13 mounts in stage 12. Other mounts use their own charts. `CD_M0003_CucuBird` is included, and steering worked while gliding in stage 12b.
-- **Game camera follow and lookahead:** stage 1 ran with both off, and steering with them on is untested. The game itself runs normally with them on.
+against the mount's facing, so the camera stays free. How it works is in [horsesteer-design.md](horsesteer-design.md),
+and test results are in [state/tests.json](state/tests.json).
 
 The game setting and camera preset routes are ruled out: both work by keeping the camera behind the horse, which breaks
 free look. No existing mod does this: the user searched Nexus and found none that do anything like this, and GitHub and web
@@ -43,7 +39,7 @@ searches found none either.
 
 ## Findings
 
-In [findings/](findings/), by topic, for build 1.0.0.3479:
+In [findings/](findings/), by topic, each section naming its build:
 
 - [input-and-steering.md](findings/input-and-steering.md): input, camera vectors, turn rates and the taming minigame
 - [charts-and-braking.md](findings/charts-and-braking.md): chart data, brake and drift, and reading or overriding keys
@@ -51,6 +47,7 @@ In [findings/](findings/), by topic, for build 1.0.0.3479:
 - [backward-walk.md](findings/backward-walk.md): how the horse's backward walk works
 - [stability.md](findings/stability.md): the freeze after a win, crashes and DMM problems
 - [offsets.md](findings/offsets.md): every address and chain, and the Horse Tap Brake reads
+- [horse-call-teleport.md](findings/horse-call-teleport.md): the distance at which a called horse teleports
 
 ## Resources
 

@@ -1,9 +1,11 @@
 # Mounts and vehicles
 
-Build 1.0.0.3479. How the horse's backward walk works, and how to check it on other mounts, is in
+How the horse's backward walk works, and how to check it on other mounts, is in
 [backward-walk.md](backward-walk.md).
 
 ## Verified from game data
+
+Build 1.0.0.3479, unless a bullet names another.
 
 - **Horse chart:** `characteractionpackagedescription.xml` maps the `CD_R0001_Horse` `RideOnHorse` slot to
   `UpperAction/4_Riding/R0001_HorseRD2_MoveTest_03_Upper`. No other package has a `RideOnHorse` slot. Other mounts such
@@ -28,8 +30,11 @@ The horse's backward walk on these mounts is covered in [backward-walk.md](backw
 
 ## From probe and test runs
 
+Stages 11 to 12b, on builds before `0x6AED2E85`.
+
 - **Mount link:** the rider's `ClientVehicleActorComponent` holds the mount key and seat, which `RideOn::Enter` reads the same way.
-- **Mount key:** this save's horse key is `0xB0100002`. Key `0xB0100003`, from captures on build 2976, was not found.
+- **Mount key:** this save's horse key is `0xB0100002`. Key `0xB0100003`, from captures on build 2976, was not found. Another save's
+  mount keys and available mounts may differ.
 - **Mount scan:** the horse's action package name is `CD_R0001_Horse`. Its appearance path is at a different chain from the protagonists'. On build 3479, inline text from the mount was at: appearance `[[[mount+0x68]+0x70]+0x188]+0x18`, model `[[[[mount+0x68]+0x40]+0x130]+0x280]+0x18`, description `[[[[mount+0x68]+0x40]+0x220]+0x18]+0x18` and ride chart `[[[[mount+0x68]+0x48]+0x140]+0x18]+0x18`. `ReadMountIdentity` logs these.
 - **Package chain:** `[[[[mount+0x68]+0x40]+0x28]+0x18]+0x48` only holds the name on some mounts, and reads garbage on others. In stage 11b, the same object held the lowercase name at `+0x18` on the camel, reindeer, snow deer, boar, wolf, iguana, carmabirdsaurus and ibex. Stage 12 confirmed it on all 13 mounts ridden, also including the horse, bear, tiger, lion and cucubird.
 - **Appearance chain:** `[[[[mount+0x68]+0x40]+0x40]+0x38]+0x18` holds the appearance path, which separates mounts that share a package. In stage 12 it read on every mount, including the camel, where the stage 11b scans didn't show it.
@@ -42,6 +47,8 @@ The horse's backward walk on these mounts is covered in [backward-walk.md](backw
   stayed inactive, which is correct. That chain doesn't always lead to a name, which matters for carriage work.
 
 ## From the vehicle and character tables
+
+Build 1.0.0.3479.
 
 `tools/mount_census.py` lists the rows. Grouping characters by the `Riding_` prefix is a naming convention, so it can miss a rideable character.
 
@@ -133,3 +140,15 @@ sessions.
 
 - **Other movement classes (Horse Tap Brake):** the exe has `VehicleMovementMethod`, `DriverMovementMethod`, `RideOnMovementMethod`, `RideOffMovementMethod` and `MiniGameMovementMethod`.
   These are names only, not traced.
+
+## Open questions
+
+- **Elephant and donkeys:** untested. The elephant (`CD_M0002_Elephant`, in `g_groundMounts`, with the same chart and
+  blend layout as the mounts that work) couldn't be reached, and donkeys have no save record. If a player reports a
+  problem with either, recheck them.
+- **Other vehicles:** the cow-drawn wagon (`cd_m0002_00_wagoncow`), the carriage (`cd_r0012_00_carriage`) and the bomb
+  cart (`cd_r0011_00_bombcart`) haven't been reached. Whenever one can be taken, drive it with `Logging=1` and check
+  `mount package` in the log. No package covers the bomb cart, so the mod should stay inactive on it.
+- **Wagon reverse steering:** as poor as the game's own, and finding the body angle was judged not worth the effort
+  (Wagon, above). If it's reopened, the cheapest step is a reduced A or D input during the brake reverse (`E14A`),
+  never tried there.

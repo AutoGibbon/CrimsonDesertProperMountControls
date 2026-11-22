@@ -1,16 +1,17 @@
 # Horse backward walk
 
-S from standing walks the horse backward, as in RDR2. It's built into `HorseSteer` with no chart patch, and is limited to `CD_R0001_Horse`. Analysed on
-build 1.0.0.3479. Stage tests and results are in `../horsesteer-tests/`, with logs in `scratch/probe-runs/stage5*/`.
+S from standing walks the horse backward, as in RDR2. It's built into `HorseSteer` with no chart patch, and is limited to `CD_R0001_Horse`. Stage tests and results are in `../horsesteer-tests/`, with logs in `scratch/probe-runs/stage5*/`.
 
 ## How it works
+
+Analysed on build 1.0.0.3479.
 
 1. **Clip:** `character/binary/motionblending/horse/locomotion.motionblending` is a `ParameterizedMotionSpace` whose clips include
    `cd_rd_prh_00_00_nor_move_walk_b_step3_00`, `bl_step3` and `br_step3`. Its inputs are `MovingSpeedForwardInLocal` and `MovingSpeedRightInLocal`, so the backward clips probably play because the position writes give the mount a backward velocity. The `walk_s` stop nodes (15, 28, 186, 271, 279) and many walk nodes use it. Idle (134)
    and the end of a stop (20) use no blend, so moving the horse there slides it in its pose.
 2. **Movement:** `UpdateBackwardWalk` adds to the physics object's position at `+0x90`. A rate of 0.5 moves the horse at about 1 m/s, and the feet match at that
    speed. Why it doubles is unknown. Most writes don't read back unchanged on the next update, so the game also changes the position. The horse follows slopes and is
-   stopped by walls.
+   stopped by walls. It writes only when the axis and position it read are finite.
 3. **State:** with no stick input, walk nodes such as 137 go to node 186. It loops on `T83`, and with no forward input it only leaves on `TC9(0.1,2)`, which looks
    like speed under 0.1 m/s. So it holds while the horse keeps moving, and the blend appears to follow the backward movement. Stage 8 logging showed one chart state held for the whole 16.5 s walk, the
    same state a walk's stop passes through. Which node that state is remains inferred.
@@ -49,7 +50,8 @@ The same method works on every mount reached in [stage 11b](../horsesteer-tests/
 | Ibex | 0.6 | 60 | `73F` |
 
 - **Speed:** on every mount, speed in m/s is about twice the rate added to the position, from 0.2 to 1.1.
-- **Turn rate:** it differs by mount and comes from the game, so `kBackwardSteer` doesn't set it. Changing it would need a chart patch or the mod writing the mount's rotation.
+- **Turn rate:** it differs by mount and comes from the game, so `kBackwardSteer` doesn't set it. Writing the mount's rotation is ruled out, as it wouldn't work well with the
+  reverse turn animation, so a reverse turn rate setting would need a chart patch.
 - **Losing the walk:** the chart can leave the walk for its stop and idle states while the position writes continue, so the mount slides at walking speed. Stage 12 logged slides over 1 s on most mounts, up to 4.6 s on the wolf, after turns and with no turn nearby, on flat ground as well as slopes. In stage 11b, the walk state didn't return before S was released in 8 of 41 releases on the camel, 6 of 14 on the boar and 2 of 5 on the bear.
 - **Chart value:** on all 13 mounts, `mount_value` is 0 in the backward walk, above 0 in reverse steering and missing in the stop and idle states. The horse's `8FC` is the exception seen, with a value of 0 during a drop at low speed.
 - **Recovery:** `UpdateBackwardRecovery` pulses when the value has been missing for 200 ms at above 0.3 m/s, and repeats every 500 ms, with no state IDs. In [stage 12b](../horsesteer-tests/stage-12b.md), slides on the camel, boar, cucubird and reindeer ended within 0.4 s, with no forward lurch, on turns, slopes and at walls. The horse's `kStateWalk` checks also catch `8FC`, and they cover the ibex too. In stages 12 to 13, 16 of their 19 pulses came below 0.5 m/s, and the other 3 at 0.8 to 0.91 m/s, close to the horse's walking speed, so they're still doing some work.
@@ -60,6 +62,8 @@ The same method works on every mount reached in [stage 11b](../horsesteer-tests/
 - **Not tested:** the elephant couldn't be reached, as its only save record didn't appear in the mount list. Its chart and blend have the same layout as the mounts above.
 
 ## What didn't work
+
+Build 1.0.0.3479.
 
 - **The `walk_b` nodes:** nodes 4, 43 and 226 have clips but no branch in from another state, and no move speed data. Routed through a stop with a chart patch, they
   animate on the spot.

@@ -1,10 +1,8 @@
 # Crashes, freezes and DMM problems
 
-Build 1.0.0.3479.
-
 ## Freeze after a won minigame
 
-The horse ignores input after a won minigame until a remount. In every logged run, it froze when no W, A, S or D key was pressed between the last release of W and the end of the minigame's UI, and moved when one was. The hooks were first blamed because `no-hooks-win` moved and the runs with hooks froze, but that run also had keys down in the window, so the hooks aren't shown to be the cause, and the freeze may happen without the mod. Six runs is few, and other keys aren't logged. No branch in the exe lands inside either hook's patched bytes.
+The horse ignores input after a won minigame until a remount. This is accepted, with a remount as the workaround. In every logged run, it froze when no W, A, S or D key was pressed between the last release of W and the end of the minigame's UI, and moved when one was. The hooks were first blamed because `no-hooks-win` moved and the runs with hooks froze, but that run also had keys down in the window, so the hooks aren't shown to be the cause, and the freeze may happen without the mod. Six runs is few, and other keys aren't logged. No branch in the exe lands inside either hook's patched bytes.
 
 | Run in `scratch/probe-runs/` | Hooks | UI ended, seconds after mounting | Keys in the window | Horse after the UI |
 | --- | --- | --- | --- | --- |

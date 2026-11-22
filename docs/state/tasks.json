@@ -171,7 +171,7 @@
       "status": "done",
       "depends_on": ["brake-while-turning"],
       "evidence": ["stage-44", "stage-45"],
-      "detail": "docs/hold-brake.md",
+      "detail": "docs/slowdown.md",
       "updated": "2026-11-22"
     },
     {
@@ -199,7 +199,7 @@
       "status": "done",
       "depends_on": ["one-gait-step-down"],
       "evidence": ["stage-48", "stage-49"],
-      "detail": "docs/hold-brake.md",
+      "detail": "docs/slowdown.md",
       "updated": "2026-11-22"
     },
     {
@@ -219,7 +219,7 @@
       "depends_on": [],
       "evidence": [
         "58a4526",
-        "every static check passed; v1.4.1 worked in game unchanged (docs/status.md before migration)"
+        "every static check passed; v1.4.1 worked in game unchanged (docs/status.md at 94235f4)"
       ],
       "updated": "2026-11-22"
     },
@@ -234,7 +234,7 @@
       "depends_on": [],
       "evidence": [],
       "blocked_by": "the next game update that breaks a lookup or field check",
-      "detail": "docs/horsesteer-status.md",
+      "detail": "docs/horsesteer-design.md#startup-checks",
       "updated": "2026-11-22"
     },
     {
@@ -258,7 +258,7 @@
       ],
       "depends_on": ["boats-static-findings"],
       "evidence": [],
-      "detail": "docs/boats/status.md",
+      "detail": "docs/boats/plan.md",
       "updated": "2026-11-22"
     },
     {
@@ -281,11 +281,11 @@
       "title": "Decide whether ship-relative steering is needed and how",
       "status": "todo",
       "done_when": [
-        "docs/boats/status.md records whether ship steering is camera-linked, and if it is, whether the mod's MoveAnalog rewrite works on a ship"
+        "docs/boats/plan.md records whether ship steering is camera-linked, and if it is, whether the mod's MoveAnalog rewrite works on a ship"
       ],
       "depends_on": ["boats-sail-observe"],
       "evidence": [],
-      "detail": "docs/boats/status.md",
+      "detail": "docs/boats/plan.md",
       "updated": "2026-11-22"
     },
     {

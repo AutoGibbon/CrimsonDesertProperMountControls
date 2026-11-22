@@ -1,6 +1,6 @@
 # Stage 48 test
 
-Holding the brake to stop on non-horse mounts ([hold-brake.md](../hold-brake.md)). On a mount that steps down one gait
+Holding the brake to stop on non-horse mounts ([slowdown.md](../slowdown.md)). On a mount that steps down one gait
 per tap, the next step down now starts while the input that started the first one is still held: the brake key with
 forward input, S with W, or the stick pulled back. At the lowest gait the existing slowdown stops the mount. Taps, the
 horse and the wagon are unchanged.
