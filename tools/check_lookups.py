@@ -4,6 +4,7 @@ Exits with 1 if any lookup fails. An exe whose PE timestamp isn't in KNOWN only 
 
 Usage: check_lookups.py EXE...
 """
+
 import collections, re, struct, sys
 
 # Section names change between builds, so sections are told apart by their flags.
@@ -73,7 +74,7 @@ KNOWN = {
         "cachedCondition": 0x3AA920,
         "cachedConditionSlot": 77,
     },
-    0x6AF5D198: {  # Steam build of 2026-11-13, not yet tested in game
+    0x6AF5D198: {  # Steam build of 2026-11-13, passed stage 37
         "vtActorManager": 0x59C2760,
         "vtVehicleComponent": 0x59C2910,
         "vtRodeoUi": 0x5AF2ED8,

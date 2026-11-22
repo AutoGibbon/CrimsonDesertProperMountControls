@@ -65,9 +65,8 @@ DMM doesn't copy `ProperHorseControls.ini` from `DMM\mods`, so put settings chan
 `bin64\dmm\manifest.tsv` before suspecting the mod (see `docs/findings/stability.md`). After a deploy, update the
 artefacts in `docs/state/environment.json`; the session start check compares the deployed asi with `build/` by hash.
 
-For a release, run `python tools/pack.py`. It builds, then writes `build/ProperHorseControls-<version>.zip` with
-`ProperHorseControls/` holding the asi, the ini, `LICENSE` and `THIRD_PARTY_NOTICES.txt`, with `Logging=0` in the zipped ini whatever the source has. Once it's on Nexus, set `nexus_version` in
-`docs/state/environment.json`.
+For a release, follow the `release` skill. `python tools/pack.py` builds, then writes `build/ProperHorseControls-<version>.zip` with
+`ProperHorseControls/` holding the asi, the ini, `LICENSE` and `THIRD_PARTY_NOTICES.txt`, with `Logging=0` in the zipped ini whatever the source has.
 
 ## Working notes
 
