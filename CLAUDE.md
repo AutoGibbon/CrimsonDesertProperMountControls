@@ -11,20 +11,21 @@ results, and `docs/horseprobe/` has the finished probe's docs.
 - Game: `Z:\SteamLibrary\steamapps\common\Crimson Desert` (executable: `bin64\CrimsonDesert.exe`)
 - Existing mod tooling: `E:\Tools\mods\crimson desert\DMM` (`DMM.exe`, with installed mods in `mods\`)
 - Installed ASI mods and their `.ini` files: the game's `bin64\`
+- Shared tooling: `../_shared` holds the venv, the CDMW checkout and one exe copy per game build, used by every
+  Crimson Desert mod project here; its `README.md` says how to recreate each.
 
 ## Layout
 
 - `docs/`: status, requirements, findings and tests
 - `tools/`: scripts and utilities for analysis and builds. Scripts that import CDMW take the path to a
   [CDMW-Full](https://github.com/Ratty123/CDMW-Full) checkout and need Python 3.11+ with `lz4`, `cryptography`, `Pillow`
-  and `numpy`. Run them with `scratch/venv/Scripts/python`, which also has `capstone`.
+  and `numpy`. Run them with `../_shared/venv/Scripts/python`, which also has `capstone`, and pass
+  `../_shared/cdmw-src` as the CDMW checkout.
 - `mod_page/`: the Nexus page's BBCode description and changelog.
 - `src/`: mod source. `HorseSteer` is the mod, published as Proper Horse Controls and built as `ProperHorseControls.asi`. `HorseProbe` is a finished diagnostic, kept as a template for watches and scans.
 - `scratch/`: git-ignored and managed by the agent; put game files, extracts and dumps here so they are not committed. Don't commit it or `build/`.
-  - `exe-baseline/`: the current exe. It can't be recreated after a game update, so don't delete it.
   - `probe-runs/`: saved test logs. Copy each test's logs here before they can be deleted or overwritten.
-  - `cdmw-src/`: CDMW source at commit `585ac51`, with no `.git`. To recreate it, run
-    `git clone https://github.com/Ratty123/CDMW-Full scratch/cdmw-src`. `cdmw-release/CDMW.exe` is downloaded but has never been run.
+  - `cdmw-release/CDMW.exe`: downloaded but has never been run.
   - `out/`: archive index (`index.tsv`), all action charts (`charts/`), English text (`loc_eng.json`) and other extracts,
     which can be regenerated with `tools/`.
   - `caballo.md`: CrimsonDesertCoop's horse research (`docs/research/caballo-coop.md`), written for build 2976.

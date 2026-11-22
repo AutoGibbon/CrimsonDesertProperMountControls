@@ -5,9 +5,10 @@ description: Check a new Crimson Desert build for changes that break Proper Hors
 
 # Check a game update
 
-Run every command from the repo root with `scratch/venv/Scripts/python`. `GAME` is
-`Z:\SteamLibrary\steamapps\common\Crimson Desert`, and `BASE` is the newest exe in `scratch/exe-baseline/`
-(`CrimsonDesert_<timestamp>.exe`).
+Run every command from the repo root with `../_shared/venv/Scripts/python`. `GAME` is
+`Z:\SteamLibrary\steamapps\common\Crimson Desert`, and `BASE` is the newest exe in `../_shared/exe-baseline/`
+(`CrimsonDesert_<timestamp>.exe`), which is shared with the other mod projects. If another project has already copied
+the new build there, `BASE` is the newest exe older than it.
 
 ## Checks
 
@@ -16,7 +17,7 @@ Run all three, even after one fails.
 1. `tools/check_lookups.py GAME/bin64/CrimsonDesert.exe BASE`. The first line gives the new PE timestamp. If it's
    already in `KNOWN`, the exe hasn't changed, so skip steps 1 and 3, but still run step 2, because the charts ship
    separately from the exe.
-2. `tools/check_charts.py GAME scratch/cdmw-src scratch/out/charts-check`. The wagon reports `UNCHECKED` every time.
+2. `tools/check_charts.py GAME ../_shared/cdmw-src scratch/out/charts-check`. The wagon reports `UNCHECKED` every time.
 3. `tools/check_fields.py BASE GAME/bin64/CrimsonDesert.exe`.
 
 ## If a check fails
@@ -36,8 +37,8 @@ still worked, while the true shift, the physics object from `+0x2C0` to `+0x2D0`
 
 ## If all checks pass
 
-1. Copy the exe to `scratch/exe-baseline/CrimsonDesert_<timestamp>.exe`, with the timestamp in uppercase hex as in the
-   existing names. Keep the older copies.
+1. If `../_shared/exe-baseline/` has no copy of the new exe, copy it there as `CrimsonDesert_<timestamp>.exe`, with the
+   timestamp in uppercase hex as in the existing names. Keep the older copies.
 2. Add the build to `KNOWN` in `tools/check_lookups.py` with the addresses it printed, commented
    `# Steam build of <date>, not yet tested in game`, and run step 1 again to confirm every line reads `ok`.
 3. Update the exe line under "Game state" in `docs/status.md`, and add the build to the paragraph on game updates in

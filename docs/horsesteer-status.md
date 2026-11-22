@@ -18,7 +18,7 @@ went from `0x286` to `0x28A`, so the count is now a wildcard in the signature; t
 moved the physics object from `+0x2C0` to `+0x2D0`, which no lookup covered, so steering and the backward walk stopped
 working with every lookup passing. `g_physicsSlot` is now looked up. The fixes passed
 [stage 37](horsesteer-tests/stage-37.md). On `0x6AFDC0CF` (2026-11-20), every static check passed and v1.4.1 works in
-game unchanged. Copies of all three exes are in `scratch/exe-baseline/`, and all three builds are in `KNOWN` in
+game unchanged. Copies of all three exes are in `../_shared/exe-baseline/`, and all three builds are in `KNOWN` in
 `tools/check_lookups.py`.
 
 ## Resume here
@@ -166,7 +166,7 @@ All done for v1.0.0.
 1. **Recovery speed limit:** done, passed [stage 18](horsesteer-tests/stage-18.md).
 2. **`Logging=0`:** done. `tools/pack.py` sets `Logging=0` in the zipped ini, so
    `src/HorseSteer/ProperHorseControls.ini` keeps `Logging=1` for tests.
-3. **Exe baseline:** done. `scratch/exe-baseline/` holds the current exe (`0x6AF5D198`) and the previous one
+3. **Exe baseline:** done. `../_shared/exe-baseline/` holds the current exe (`0x6AF5D198`) and the previous one
    (`0x6AED2E85`), and `KNOWN` has both builds' addresses. The 3479 and 26423880 copies were discarded.
 4. **Shift+F5, toggle key and reverse steering invert:** done, passed [stage 19](horsesteer-tests/stage-19.md) on the
    horse and wagon. Shift+F5 and `g_flip` are gone, `Toggle` under `[Keys]` sets the toggle key, and `InvertSteer`

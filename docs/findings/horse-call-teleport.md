@@ -1,6 +1,6 @@
 # Horse call: teleport distance
 
-PE timestamp `0x6AF5D198`, from static analysis of `scratch/exe-baseline/CrimsonDesert_6AF5D198.exe`. Not yet tested in game.
+PE timestamp `0x6AF5D198`, from static analysis of `../_shared/exe-baseline/CrimsonDesert_6AF5D198.exe`. Not yet tested in game.
 Addresses are RVAs and are specific to this build.
 
 When the horse is called with H, it teleports to the player rather than pathfinding if it's farther away than a threshold. The
@@ -12,7 +12,7 @@ threshold is very likely the `pa::GlobalVariableFloat` below, with a default of 
 | --- | --- | --- |
 | `GlobalVariableFloat` object | `0x71D1BB0` | Name hash `0xB0BAB4F0`; the name string isn't in the exe |
 | Current value | `0x71D1BE8` (object `+0x38`) | In `.sxdata`, zero on disk; write this to change the threshold |
-| Default copy | `0x71D1BEC` (object `+0x3C`) | |
+| Default copy | `0x71D1BEC` (object `+0x3C`) |  |
 | Default constant | `0x61BF02C` (`.00cfg`) | `64.0` |
 | Static initializer | `0x2161EB` | Copies the constant into `+0x38` and `+0x3C`, then registers the object with `GlobalVariableManager` |
 

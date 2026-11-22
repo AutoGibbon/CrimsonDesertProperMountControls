@@ -9,7 +9,7 @@ The lookups don't cover field offsets, apart from the ones in the signatures (`+
 `+0x68`, `+0x40`, `+0x140` chain), the physics object's offset (`g_physicsSlot`), or the rodeo slot number.
 `tools/check_fields.py OLD_EXE NEW_EXE` compares the pointer chains the mod reads and rodeo slot 47 between two builds;
 float fields such as the physics object's `+0x80` and `+0x90` aren't covered. If a lookup fails, check [CrimsonDesertCoop](https://github.com/macauleywilliams96-dotcom/CrimsonDesertCoop)
-for new offsets, or port them with its `PORTING-3479.md` method using `scratch/exe-baseline/`. To re-derive the camera slot, use
+for new offsets, or port them with its `PORTING-3479.md` method using `../_shared/exe-baseline/`. To re-derive the camera slot, use
 `docs/ENGINE_CAMERA_RESEARCH.md` from CrimsonDesertTelemetry.
 
 ## Used by `HorseSteer` and working in game
