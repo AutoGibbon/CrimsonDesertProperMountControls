@@ -189,7 +189,7 @@
       "title": "Releasing A or D eases steering back to straight over KeyRampMs",
       "status": "done",
       "depends_on": ["key-ramp-setting"],
-      "evidence": ["a9a2b1b", "no test file records it; released in 1.4.1"],
+      "evidence": ["a9a2b1b", "user: tested informally before 1.4.1 and confirmed verbally; no test file records it"],
       "updated": "2026-11-22"
     },
     {
@@ -217,10 +217,7 @@
       "title": "Game update 0x6AFDC0CF: static checks and v1.4.1 in game",
       "status": "done",
       "depends_on": [],
-      "evidence": [
-        "58a4526",
-        "every static check passed; v1.4.1 worked in game unchanged (docs/status.md at 94235f4)"
-      ],
+      "evidence": ["58a4526", "every static check passed; v1.4.1 worked in game unchanged (docs/status.md at 94235f4)"],
       "updated": "2026-11-22"
     },
     {

@@ -21,11 +21,6 @@ Replicate Red Dead Redemption 2's horse-relative controls, through a native ASI 
   does.
 - **Mounts:** a public release needs every legged ground mount to work. Carriages should get similar controls if possible. The exosuit/mech suit is excluded.
 
-## Done when
-
-- All requirements have been tested in game on the current build.
-- The hook points and evidence are documented, with verified findings kept separate from hypotheses.
-
 ## Approach
 
 `src/HorseSteer` hooks `ClientInputActorComponent`'s per-frame update while the player is mounted, and replaces its copied

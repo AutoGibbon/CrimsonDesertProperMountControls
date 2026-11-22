@@ -58,6 +58,7 @@
       "notes": "In DMM\\mods but not in bin64. Its auto move conflicts on mounts; see the README's compatibility section"
     },
     { "name": "CrimsonBodyWeatherSnowMaskTest", "on": false, "notes": "In DMM\\mods but not in bin64" },
+    { "name": "Seasons", "on": false, "notes": "Seasons.asi in DMM\\mods; bin64 has only Seasons.ini" },
     {
       "name": "DMM data mods",
       "on": true,
