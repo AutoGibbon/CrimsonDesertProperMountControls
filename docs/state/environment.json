@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "updated": "2026-11-22",
+  "facts": {
+    "exe_timestamp": "0x6AFDC0CF",
+    "exe_seen": "2026-11-20",
+    "exe_baselines": "../_shared/exe-baseline/ holds 0x6AED2E85, 0x6AF5D198 and 0x6AFDC0CF",
+    "dlc": "dlc_01 (Charting the Unknown), installed 2026-11-08 in dlc/dlc_01/",
+    "test_save": "save slot 1, edited to add mounts other than the horse when a test needs them",
+    "nexus_version": "1.4.1"
+  },
+  "artefacts": [
+    {
+      "name": "ProperHorseControls.asi (DMM)",
+      "built": "build/HorseSteer/Release/ProperHorseControls.asi",
+      "deployed": "E:/Tools/mods/crimson desert/DMM/mods/ProperHorseControls.asi",
+      "commit": "045f9de",
+      "date": "2026-11-16",
+      "enabled": true,
+      "notes": "The 1.4.1 release build, the same file as in build/ProperHorseControls-1.4.1.zip"
+    },
+    {
+      "name": "ProperHorseControls.asi (bin64)",
+      "built": "build/HorseSteer/Release/ProperHorseControls.asi",
+      "deployed": "Z:/SteamLibrary/steamapps/common/Crimson Desert/bin64/ProperHorseControls.asi",
+      "commit": "045f9de",
+      "date": "2026-11-16",
+      "enabled": true,
+      "notes": "Copied from DMM on apply. bin64/ProperHorseControls.ini has Logging=0; set Logging=1 there before a test"
+    },
+    {
+      "name": "ProperHorseControls-1.4.1.zip",
+      "built": "build/ProperHorseControls-1.4.1.zip",
+      "commit": "045f9de",
+      "date": "2026-11-16",
+      "notes": "On Nexus"
+    }
+  ],
+  "installed": [
+    { "name": "DmmRuntime.asi and winmm.dll loader", "on": true, "notes": "Load the asi mods" },
+    { "name": "ReShade (dxgi.dll) with RenoDX and LODFix-by-Sharky addons", "on": true, "notes": "Rendering only" },
+    { "name": "AmbientMixer", "on": true },
+    { "name": "AutoLetThereBeLight", "on": true },
+    { "name": "BodyPhysics", "on": true },
+    { "name": "CombatEvolved", "on": true },
+    { "name": "CrimsonDesertEquipHide", "on": true },
+    { "name": "EquipEverything", "on": true },
+    { "name": "HeroineOfPywel", "on": true },
+    { "name": "HoldMiniMap", "on": true },
+    { "name": "ImprovedAxiomManeuver", "on": true },
+    { "name": "SkillVideoFix", "on": true },
+    { "name": "VAXISDestruction", "on": true },
+    { "name": "WeatherMod", "on": true, "notes": "The user's own mod, from another project" },
+    {
+      "name": "CrimsonRoute",
+      "on": false,
+      "notes": "In DMM\\mods but not in bin64. Its auto move conflicts on mounts; see the README's compatibility section"
+    },
+    { "name": "CrimsonBodyWeatherSnowMaskTest", "on": false, "notes": "In DMM\\mods but not in bin64" },
+    {
+      "name": "DMM data mods",
+      "on": true,
+      "notes": "The folder mods in DMM\\mods: armour, body, textures, idles, vendor, map, fire, weather and text mods; not checked for changes to riding"
+    }
+  ]
+}

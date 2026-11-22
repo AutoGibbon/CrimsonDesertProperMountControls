@@ -1,0 +1,306 @@
+{
+  "schema": 1,
+  "statuses": ["todo", "in_progress", "blocked", "done", "dropped"],
+  "items": [
+    {
+      "id": "steering-free-look",
+      "workstream": "land-mounts",
+      "title": "W, A and D steer the mount by its own facing at every gait, S with A or D pivots, and free look never changes its course",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-1", "stage-3", "stage-4"],
+      "detail": "docs/findings/input-and-steering.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "backward-walk",
+      "workstream": "land-mounts",
+      "title": "S from standing walks the mount backward, recovering when the chart leaves the walk",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-6", "stage-9d", "stage-12b", "stage-18"],
+      "detail": "docs/findings/backward-walk.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "taming-pause",
+      "workstream": "land-mounts",
+      "title": "The mod pauses during the taming minigame",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["taming-minigame", "stage-10"],
+      "detail": "docs/findings/input-and-steering.md#taming-minigame",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "startup-lookups",
+      "workstream": "land-mounts",
+      "title": "Addresses found at startup by RTTI, reference counts and signatures, with the mod idle if a required lookup fails",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-10", "stage-10b"],
+      "detail": "docs/findings/offsets.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "all-ground-mounts",
+      "workstream": "land-mounts",
+      "title": "Controls and backward walk on every reachable legged ground mount, recognised by action package",
+      "status": "done",
+      "depends_on": ["steering-free-look", "backward-walk"],
+      "evidence": ["stage-12", "stage-12b", "stage-13"],
+      "detail": "docs/findings/mounts-and-vehicles.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "wagon-controls",
+      "workstream": "land-mounts",
+      "title": "Forward steering on the wagon, and S as its brake reverse",
+      "status": "done",
+      "depends_on": ["steering-free-look"],
+      "evidence": ["stage-14", "stage-15"],
+      "detail": "docs/findings/mounts-and-vehicles.md#wagon",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "toggle-key-invert",
+      "workstream": "land-mounts",
+      "title": "Toggle key setting, Shift+F5 removed, and InvertSteer for reverse steering",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-19"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "missing-ini-settings",
+      "workstream": "land-mounts",
+      "title": "LoadSettings writes any missing setting with its default",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-20"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "tap-slowdown",
+      "workstream": "land-mounts",
+      "title": "Tapping S with W held, the brake key or the stick back slows any mount or the wagon by one gait",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-25", "stage-28", "stage-29"],
+      "detail": "docs/findings/charts-and-braking.md#slowing-a-mount-with-s",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "stick-deadzone",
+      "workstream": "land-mounts",
+      "title": "StickDeadzone: a stick pulled back slightly off center walks backward instead of turning",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-30"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "feature-flags",
+      "workstream": "land-mounts",
+      "title": "CameraDetached and TapBrake turn off the mount-relative controls and the slowdown separately",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-31"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "reload-key",
+      "workstream": "land-mounts",
+      "title": "The Reload key reads the ini again in game",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-31", "stage-36"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "suspend-export",
+      "workstream": "land-mounts",
+      "title": "PHC_SetSuspended export lets another mod turn this one off while it holds it",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-33"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "key-ramp-setting",
+      "workstream": "land-mounts",
+      "title": "KeyRampMs setting, with a 100 ms floor when standing",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-34", "stage-35"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "steering-bias-settings",
+      "workstream": "land-mounts",
+      "title": "LowSpeed, LowSpeedBias, HighSpeed and HighSpeedBias settings, and Reload resetting deleted keys",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-36"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "update-6af5d198",
+      "workstream": "land-mounts",
+      "title": "Game update 0x6AF5D198: wildcard condition count and the physicsSlot lookup",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-37"],
+      "detail": "docs/findings/offsets.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "brake-while-turning",
+      "workstream": "land-mounts",
+      "title": "A slowdown works with steering held, by answering T10 and TE for the mount through slot 77",
+      "status": "done",
+      "depends_on": ["tap-slowdown"],
+      "evidence": ["stage-42", "stage-45"],
+      "detail": "docs/findings/charts-and-braking.md#slowing-while-steering",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "one-gait-step-down",
+      "workstream": "land-mounts",
+      "title": "Non-horse mounts drop one gait per tap, by answering T66 until the state changes",
+      "status": "done",
+      "depends_on": ["brake-while-turning"],
+      "evidence": ["stage-44", "stage-45"],
+      "detail": "docs/hold-brake.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "follower-riding",
+      "workstream": "land-mounts",
+      "title": "Controls follow the controlled character's mount, including a follower's",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-46", "stage-47"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "key-release-ramp",
+      "workstream": "land-mounts",
+      "title": "Releasing A or D eases steering back to straight over KeyRampMs",
+      "status": "done",
+      "depends_on": ["key-ramp-setting"],
+      "evidence": ["a9a2b1b", "no test file records it; released in 1.4.1"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "hold-brake",
+      "workstream": "land-mounts",
+      "title": "Holding the brake key, S with W, or the stick back steps a non-horse mount down every gait to a stop",
+      "status": "done",
+      "depends_on": ["one-gait-step-down"],
+      "evidence": ["stage-48", "stage-49"],
+      "detail": "docs/hold-brake.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "brake-gap-race-fix",
+      "workstream": "land-mounts",
+      "title": "UpdateBrakeGap runs for the mount's input only, under a try-lock",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["stage-49"],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "update-6afdc0cf",
+      "workstream": "land-mounts",
+      "title": "Game update 0x6AFDC0CF: static checks and v1.4.1 in game",
+      "status": "done",
+      "depends_on": [],
+      "evidence": [
+        "58a4526",
+        "every static check passed; v1.4.1 worked in game unchanged (docs/status.md before migration)"
+      ],
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "regression-shutdown",
+      "workstream": "land-mounts",
+      "title": "Any failed startup check turns the whole mod off, instead of running with optional features dropped",
+      "status": "blocked",
+      "done_when": [
+        "With any lookup failing, including keyCheck, conditionTableCall, the slot 77 lookup and the rodeo switch, the log ends with MOD INACTIVE and the game plays as unmodded"
+      ],
+      "depends_on": [],
+      "evidence": [],
+      "blocked_by": "the next game update that breaks a lookup or field check",
+      "detail": "docs/horsesteer-status.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "boats-static-findings",
+      "workstream": "boats",
+      "title": "Read the ship charts, vehicle data, input map and the DLC's sailing text",
+      "status": "done",
+      "depends_on": [],
+      "evidence": ["docs/boats/static-findings.md", "Claude's reading of game files; nothing checked in game"],
+      "detail": "docs/boats/static-findings.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "boats-reach-ship",
+      "workstream": "boats",
+      "title": "Tester reaches a ship that can be sailed",
+      "status": "todo",
+      "next": true,
+      "done_when": [
+        "The tester has a ship at a port with its crew roles, including a Rigger, assigned, and can set sail"
+      ],
+      "depends_on": ["boats-static-findings"],
+      "evidence": [],
+      "detail": "docs/boats/status.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "boats-sail-observe",
+      "workstream": "boats",
+      "title": "Sail with Logging=1 and the mod inactive, and check the predictions against play",
+      "status": "todo",
+      "done_when": [
+        "Predictions 1 to 16 have an In game result, and the ship's package name is read from the mount package not recognised log line",
+        "docs/boats/static-findings.md is corrected wherever play contradicts it"
+      ],
+      "depends_on": ["boats-reach-ship"],
+      "evidence": [],
+      "detail": "docs/boats/static-findings.md#predictions-to-check-in-game",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "boats-steering-decision",
+      "workstream": "boats",
+      "title": "Decide whether ship-relative steering is needed and how",
+      "status": "todo",
+      "done_when": [
+        "docs/boats/status.md records whether ship steering is camera-linked, and if it is, whether the mod's MoveAnalog rewrite works on a ship"
+      ],
+      "depends_on": ["boats-sail-observe"],
+      "evidence": [],
+      "detail": "docs/boats/status.md",
+      "updated": "2026-11-22"
+    },
+    {
+      "id": "horse-call-teleport-research",
+      "workstream": "horse-call",
+      "title": "Finish discovery on the distance at which a called horse teleports",
+      "status": "todo",
+      "done_when": [
+        "The addresses are re-found on the current build, and an in-game test with the threshold at 20 shows whether a horse called from about 30 m teleports",
+        "The doc says whether the horse's AI chart compares the leader distance against the 64 m value directly or scales it"
+      ],
+      "depends_on": [],
+      "evidence": [],
+      "detail": "docs/findings/horse-call-teleport.md",
+      "updated": "2026-11-22"
+    }
+  ]
+}
