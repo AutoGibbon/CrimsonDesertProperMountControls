@@ -16,9 +16,10 @@ probe's docs.
 - **Queries:** list, show and trace tasks and tests with `tools/tasks.py`, not one-off scripts over the JSON.
 - **Starting a task:** agree its `done_when` with the user when setting it `in_progress`. Check the open questions in
   the findings docs the task touches; one it depends on becomes a task or a `done_when` line now.
-- **During:** update a JSON entry in `docs/state/` when its state changes, not at the end. When a result answers an
-  open question, take it off its list in the same commit. Commit after each finished step, with a message saying what
-  changed and why.
+- **During:** update a JSON entry in `docs/state/` when its state changes, not at the end. Write an open question into
+  its findings doc, and a note for an upcoming task into the doc its `detail` points to, when it comes up. When a
+  result answers an open question, take it off its list in the same commit. Commit after each finished step, with a
+  message saying what changed and why.
 - **Done:** record in `evidence` what showed it: a test, a command and its output, or the user's confirmation. For
   code, scripts or data Claude can check without the user, a review by a session that didn't write it (`/code-review`,
   or a read-only reviewer subagent given the task's `done_when`, reporting correctness gaps only and skipping style)
