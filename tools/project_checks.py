@@ -16,7 +16,8 @@ def pe_timestamp(path):
 
 
 def check(root, env):
-    """Check the game exe build, the shared tooling and the age of extracts against env["facts"]; return problems.
+    """Check the game exe build, the shared tooling and the age of extracts against env["facts"]; return
+    (problems, notes).
 
     root is the project directory as a Path; env is docs/state/environment.json as a dict.
     """
@@ -40,7 +41,8 @@ def check(root, env):
     if not (shared / "cdmw-src").is_dir():
         problems.append(f"CDMW checkout missing at {shared / 'cdmw-src'}: see {shared / 'README.md'}")
 
-    # Stale extracts are printed as notes, not problems, because they matter only to work that reads them.
+    # Stale extracts are notes, not problems, because they matter only to work that reads them.
+    notes = []
     seen = datetime.date.fromisoformat(facts["exe_seen"]) if facts.get("exe_seen") else None
     stale = [
         p
@@ -48,8 +50,8 @@ def check(root, env):
         if seen and (root / p).exists() and datetime.date.fromtimestamp((root / p).stat().st_mtime) < seen
     ]
     if stale:
-        print(
-            f"  note: extracts older than the exe seen {seen}; regenerate with tools/ before relying on them: "
+        notes.append(
+            f"extracts older than the exe seen {seen}; regenerate with tools/ before relying on them: "
             + ", ".join(stale)
         )
-    return problems
+    return problems, notes
