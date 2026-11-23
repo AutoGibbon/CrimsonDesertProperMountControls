@@ -59,7 +59,7 @@ WORLD_MIN_RATIO = 3
 PHYSICS_CHAIN = re.compile(rb"\x8B.\x68.\x8B.\x40.\x8B.\x40\x01\x00\x00(.)\x8B.(....)", re.DOTALL)
 
 KNOWN = {
-    0x6AED2E85: {  # Steam build of 2026-11-06, passed stage 18
+    0x6AED2E85: {  # Steam build of 2026-11-06; in-game test stage-18
         "vtActorManager": 0x5946C40,
         "vtVehicleComponent": 0x5946C98,
         "vtRodeoUi": 0x5A747E8,
@@ -74,7 +74,7 @@ KNOWN = {
         "cachedCondition": 0x3AA920,
         "cachedConditionSlot": 77,
     },
-    0x6AF5D198: {  # Steam build of 2026-11-13, passed stage 37
+    0x6AF5D198: {  # Steam build of 2026-11-13; in-game test stage-37
         "vtActorManager": 0x59C2760,
         "vtVehicleComponent": 0x59C2910,
         "vtRodeoUi": 0x5AF2ED8,
@@ -89,7 +89,7 @@ KNOWN = {
         "cachedCondition": 0x3ADF70,
         "cachedConditionSlot": 77,
     },
-    0x6AFDC0CF: {  # Steam build of 2026-11-20, works in game with v1.4.1
+    0x6AFDC0CF: {  # Steam build of 2026-11-20; in-game check in task update-6afdc0cf
         "vtActorManager": 0x59C7A08,
         "vtVehicleComponent": 0x59C7848,
         "vtRodeoUi": 0x5AF6C28,

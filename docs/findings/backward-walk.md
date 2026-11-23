@@ -1,6 +1,6 @@
 # Horse backward walk
 
-S from standing walks the horse backward, as in RDR2. It's built into `HorseSteer` with no chart patch, and is limited to `CD_R0001_Horse`. Stage tests and results are in `../horsesteer-tests/`, with logs in `scratch/probe-runs/stage5*/`.
+S from standing walks the horse backward, as in RDR2. It's built into `HorseSteer` with no chart patch, and is limited to `CD_R0001_Horse`. Stage tests and results are in `../tests/`, with logs in `scratch/probe-runs/stage5*/`.
 
 ## How it works
 
@@ -25,7 +25,7 @@ Analysed on build 1.0.0.3479.
 
 - The cause of state drops is unknown. Three logged at about 1 m/s came at a grade of about +0.5, but the horse also held `A73F` on stretches up to +0.72, and speed is well above the 0.1 of `TC9(0.1,2)`, so that condition's meaning above is in doubt. Stage 9's state drops within about 0.2 s of releasing A or D, in 8 of 9 cases, didn't reproduce in stages 9b to 9d.
 - Against a wall or stuck on an object, `UpdateBackwardRecovery` pulsed once a second for as long as S was held. From
-  [stage 18](../horsesteer-tests/stage-18.md) it only pulses above 0.3 m/s, which left out 26 of the 46 pulses in the
+  [stage 18](../tests/stage-18.md) it only pulses above 0.3 m/s, which left out 26 of the 46 pulses in the
   saved logs. The tester didn't notice the pulses at a wall. During one stuck stretch on a slope, the horse moved forward at up to 0.71 m/s for about 0.9 s in states `BE4D` and `BFCE`, and whether the pulses caused it is unknown.
 - `kStateWalk`, `kStateWalkSteer` and `kStateWalkStart` are the low 16 bits of a pointer, not a confirmed identity. If they stop matching, recovery doesn't fire.
 - At a wall, the horse backs in until the rider's collider stops it, so its rear goes into the wall.
@@ -34,32 +34,32 @@ Analysed on build 1.0.0.3479.
 
 ## Other mounts
 
-The same method works on every mount reached in [stage 11b](../horsesteer-tests/stage-11b.md): the camel, reindeer, snow deer, boar, bear, wolf, tiger, iguana, carmabirdsaurus and ibex. The tester passed all steps, including W after reverse and starting from a run. The per-mount nodes are in [mounts-and-vehicles.md](mounts-and-vehicles.md).
+The same method works on every mount reached in [stage 11b](../tests/stage-11b.md): the camel, reindeer, snow deer, boar, bear, wolf, tiger, iguana, carmabirdsaurus and ibex. The tester passed all steps, including W after reverse and starting from a run. The per-mount nodes are in [mounts-and-vehicles.md](mounts-and-vehicles.md).
 
-| Mount | Best rate | Reverse turn, °/s | Walk state, low 12 bits |
-| --- | --- | --- | --- |
-| Camel | 0.9 to 1.0 | 147 | `C1F` |
-| Reindeer | 0.7 | 59 | `B3B` |
-| Snow deer | 0.6 | not enough data | `B3B` |
-| Boar or warthog | 0.8 | 59 | `E7A` |
-| Bear | 0.9 | 60 | `61B` |
-| Wolf | 0.9 | 148 | `BCB` |
-| Tiger | 0.8 | 141 | `BCB` |
-| Iguana | 0.6 | 60 | `DF1` |
-| Carmabirdsaurus | 0.8 | 151 | `BCB` |
-| Ibex | 0.6 | 60 | `73F` |
+| Mount           | Best rate  | Reverse turn, °/s | Walk state, low 12 bits |
+| --------------- | ---------- | ----------------- | ----------------------- |
+| Camel           | 0.9 to 1.0 | 147               | `C1F`                   |
+| Reindeer        | 0.7        | 59                | `B3B`                   |
+| Snow deer       | 0.6        | not enough data   | `B3B`                   |
+| Boar or warthog | 0.8        | 59                | `E7A`                   |
+| Bear            | 0.9        | 60                | `61B`                   |
+| Wolf            | 0.9        | 148               | `BCB`                   |
+| Tiger           | 0.8        | 141               | `BCB`                   |
+| Iguana          | 0.6        | 60                | `DF1`                   |
+| Carmabirdsaurus | 0.8        | 151               | `BCB`                   |
+| Ibex            | 0.6        | 60                | `73F`                   |
 
 - **Speed:** on every mount, speed in m/s is about twice the rate added to the position, from 0.2 to 1.1.
 - **Turn rate:** it differs by mount and comes from the game, so `kBackwardSteer` doesn't set it. Writing the mount's rotation is ruled out, as it wouldn't work well with the
   reverse turn animation, so a reverse turn rate setting would need a chart patch.
 - **Losing the walk:** the chart can leave the walk for its stop and idle states while the position writes continue, so the mount slides at walking speed. Stage 12 logged slides over 1 s on most mounts, up to 4.6 s on the wolf, after turns and with no turn nearby, on flat ground as well as slopes. In stage 11b, the walk state didn't return before S was released in 8 of 41 releases on the camel, 6 of 14 on the boar and 2 of 5 on the bear.
 - **Chart value:** on all 13 mounts, `mount_value` is 0 in the backward walk, above 0 in reverse steering and missing in the stop and idle states. The horse's `8FC` is the exception seen, with a value of 0 during a drop at low speed.
-- **Recovery:** `UpdateBackwardRecovery` pulses when the value has been missing for 200 ms at above 0.3 m/s, and repeats every 500 ms, with no state IDs. In [stage 12b](../horsesteer-tests/stage-12b.md), slides on the camel, boar, cucubird and reindeer ended within 0.4 s, with no forward lurch, on turns, slopes and at walls. The horse's `kStateWalk` checks also catch `8FC`, and they cover the ibex too. In stages 12 to 13, 16 of their 19 pulses came below 0.5 m/s, and the other 3 at 0.8 to 0.91 m/s, close to the horse's walking speed, so they're still doing some work.
+- **Recovery:** `UpdateBackwardRecovery` pulses when the value has been missing for 200 ms at above 0.3 m/s, and repeats every 500 ms, with no state IDs. In [stage 12b](../tests/stage-12b.md), slides on the camel, boar, cucubird and reindeer ended within 0.4 s, with no forward lurch, on turns, slopes and at walls. The horse's `kStateWalk` checks also catch `8FC`, and they cover the ibex too. In stages 12 to 13, 16 of their 19 pulses came below 0.5 m/s, and the other 3 at 0.8 to 0.91 m/s, close to the horse's walking speed, so they're still doing some work.
 - **A single pulse on release:** a pulse 100 ms after releasing A or D caused no forward lurch in 77 uses, but it didn't stop the losses, and it delayed the walk state's return from about 110 ms to about 330 ms. In boar failures, the state went from steering straight to stop then idle. The pulse probably landed during the stop clip, which ignores input, though this is inferred.
 - **State IDs:** the low 16 bits of a chart state pointer aren't stable on every mount, since the reindeer's walk state was `6B3B` in stage 11 and `0B3B` in stage 11b, while the low 12 bits matched. `kStateWalk` and `kStateWalkSteer` still only match the horse and ibex.
 - **S with the mod off:** the camel, reindeer, boar, bear, wolf, iguana and carmabirdsaurus moved forward along their facing, about 175° from the backward axis, so clearing S doesn't block a backward move on them.
 - **Stage 12 additions:** the cucubird and lion also work, with feet matching at 1.0 and 1.7 m/s. Their walk states are `B13` and `BCB`.
-- **Not tested:** the elephant couldn't be reached, as its only save record didn't appear in the mount list. Its chart and blend have the same layout as the mounts above.
+- **Not tested:** the elephant; see [Open questions](mounts-and-vehicles.md#open-questions) in mounts-and-vehicles.md.
 
 ## What didn't work
 

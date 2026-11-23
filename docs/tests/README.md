@@ -1,20 +1,20 @@
 # HorseSteer tests
 
-Give each new test its own file, `stage-N.md`, with its steps and results, and add an entry to
-[../state/tests.json](../state/tests.json), which holds every test's status and result.
+What HorseSteer's tests add to the gibbon plugin's test template. Name each new test file `stage-N.md`, after the last
+stage, and its `tests.json` id `stage-N`.
 
 ## Writing steps
 
 Holding W only keeps the mount at its current gait, and each Shift tap raises it one gait. A step that expects the mount
 to speed up again after a slowdown must say to tap Shift, not to hold W. Name gaits as the tester does:
 
-| Gait | Horse state | Horse `mount_value` |
-| --- | --- | --- |
-| Walk | `A56E` | 2.8 |
-| Trot | `B4A7` | 5.2 |
-| Canter | `C2B2` | 9.5 |
-| Gallop 1 | `D099` | 12 |
-| Gallop 2 | `E38E` | 14 |
+| Gait     | Horse state | Horse `mount_value` |
+| -------- | ----------- | ------------------- |
+| Walk     | `A56E`      | 2.8                 |
+| Trot     | `B4A7`      | 5.2                 |
+| Canter   | `C2B2`      | 9.5                 |
+| Gallop 1 | `D099`      | 12                  |
+| Gallop 2 | `E38E`      | 14                  |
 
 Holding Shift past gallop 2 is a mount skill that goes faster still for a while.
 

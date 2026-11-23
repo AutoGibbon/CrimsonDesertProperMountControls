@@ -59,7 +59,7 @@ Logs are in `scratch/probe-runs/steer1/` and `steer2/`.
 - **Steering tuning:** stage 4 passed in game, and the tester rated a 300 ms `KeyRampMs` and the 80° and 55° angles about
   right. v1.3.1 made the angles `LowSpeedBias` 0.89 and `HighSpeedBias` 0.61 (W+A's angle as a share of 90°), with the
   blend moved from 2.5–5.0 m/s to `LowSpeed` 2.2 and `HighSpeed` 4.8. Bias 0, 1 and a fade between were checked in
-  [stage 36](../horsesteer-tests/stage-36.md). The 85° cap's reason wasn't recorded; it keeps some forward input.
+  [stage 36](../tests/stage-36.md). The 85° cap's reason wasn't recorded; it keeps some forward input.
 - **Keyboard steering, 1.1.0 against 1.3.0:** a player reported it slower in 1.3.0. Their logs
   (`scratch/probe-runs/player-report-1110/`) show the 300 ms ramp working as designed, and the steering code is
   identical across those versions, so there's no regression.

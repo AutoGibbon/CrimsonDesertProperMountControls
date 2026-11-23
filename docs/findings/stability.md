@@ -13,7 +13,7 @@ The horse ignores input after a won minigame until a remount. This is accepted, 
 | `f5-off-win` | Yes, mod off with F5 | 16.1 | None: W released at 13.9, next W at 17.2 | Frozen |
 | `no-stub-win` | Yes, no rodeo stub | Not logged | None: W released at 12.8, next W at 17.0 | Frozen |
 
-[Stage 10b](../horsesteer-tests/stage-10b.md) tamed one horse with no hooks and it moved, but the tester wasn't sure the keys were released in time, and that build logs no keys, so it doesn't settle whether the freeze happens without hooks.
+[Stage 10b](../tests/stage-10b.md) tamed one horse with no hooks and it moved, but the tester wasn't sure the keys were released in time, and that build logs no keys, so it doesn't settle whether the freeze happens without hooks.
 
 In `stage10`, both tames reached state `672A9`. The first left it for `62592` as the UI closed, and the second stayed in it until the dismount 11.5 s later, with keys reaching the stick values. S still moves the horse backward in that state, because the position writes don't depend on it.
 

@@ -4,7 +4,7 @@
   "tests": [
     {
       "id": "stage-1",
-      "file": "docs/horsesteer-tests/stage-1.md",
+      "file": "docs/tests/stage-1.md",
       "checks": "Forward steering and free look",
       "status": "passed",
       "tasks": ["steering-free-look"],
@@ -12,7 +12,7 @@
     },
     {
       "id": "stage-2",
-      "file": "docs/horsesteer-tests/stage-2.md",
+      "file": "docs/tests/stage-2.md",
       "checks": "S as a brake, horse-only check",
       "status": "failed",
       "tasks": ["tap-slowdown"],
@@ -20,7 +20,7 @@
     },
     {
       "id": "stage-2b",
-      "file": "docs/horsesteer-tests/stage-2b.md",
+      "file": "docs/tests/stage-2b.md",
       "checks": "Steering restored, mount scan, S",
       "status": "partial",
       "tasks": ["steering-free-look", "tap-slowdown"],
@@ -28,7 +28,7 @@
     },
     {
       "id": "stage-3",
-      "file": "docs/horsesteer-tests/stage-3.md",
+      "file": "docs/tests/stage-3.md",
       "checks": "Land-mount check, tighter steering",
       "status": "passed",
       "tasks": ["steering-free-look"],
@@ -36,7 +36,7 @@
     },
     {
       "id": "stage-4",
-      "file": "docs/horsesteer-tests/stage-4.md",
+      "file": "docs/tests/stage-4.md",
       "checks": "Steering ramp",
       "status": "passed",
       "tasks": ["steering-free-look"],
@@ -44,7 +44,7 @@
     },
     {
       "id": "stage-5",
-      "file": "docs/horsesteer-tests/stage-5.md",
+      "file": "docs/tests/stage-5.md",
       "checks": "S brake, backward clips",
       "status": "failed",
       "tasks": ["tap-slowdown", "backward-walk"],
@@ -52,7 +52,7 @@
     },
     {
       "id": "stage-5b",
-      "file": "docs/horsesteer-tests/stage-5b.md",
+      "file": "docs/tests/stage-5b.md",
       "checks": "Clips through a JSON patch",
       "status": "failed",
       "tasks": ["backward-walk"],
@@ -60,7 +60,7 @@
     },
     {
       "id": "stage-5c",
-      "file": "docs/horsesteer-tests/stage-5c.md",
+      "file": "docs/tests/stage-5c.md",
       "checks": "Move speed data on the backward loop",
       "status": "failed",
       "tasks": ["backward-walk"],
@@ -68,7 +68,7 @@
     },
     {
       "id": "stage-5d",
-      "file": "docs/horsesteer-tests/stage-5d.md",
+      "file": "docs/tests/stage-5d.md",
       "checks": "Same, with a key held",
       "status": "failed",
       "tasks": ["backward-walk"],
@@ -76,7 +76,7 @@
     },
     {
       "id": "stage-5e",
-      "file": "docs/horsesteer-tests/stage-5e.md",
+      "file": "docs/tests/stage-5e.md",
       "checks": "Fixed patch field",
       "status": "failed",
       "tasks": ["backward-walk"],
@@ -84,7 +84,7 @@
     },
     {
       "id": "stage-5f",
-      "file": "docs/horsesteer-tests/stage-5f.md",
+      "file": "docs/tests/stage-5f.md",
       "checks": "Moving the horse from the mod",
       "status": "partial",
       "tasks": ["backward-walk"],
@@ -92,7 +92,7 @@
     },
     {
       "id": "stage-5g",
-      "file": "docs/horsesteer-tests/stage-5g.md",
+      "file": "docs/tests/stage-5g.md",
       "checks": "Slower movement, restored clip data",
       "status": "passed",
       "tasks": ["backward-walk"],
@@ -100,7 +100,7 @@
     },
     {
       "id": "stage-5h",
-      "file": "docs/horsesteer-tests/stage-5h.md",
+      "file": "docs/tests/stage-5h.md",
       "checks": "That backward walk without the test chart",
       "status": "partial",
       "tasks": ["backward-walk"],
@@ -108,7 +108,7 @@
     },
     {
       "id": "stage-5i",
-      "file": "docs/horsesteer-tests/stage-5i.md",
+      "file": "docs/tests/stage-5i.md",
       "checks": "Forward pulse to start the walk",
       "status": "partial",
       "tasks": ["backward-walk"],
@@ -116,7 +116,7 @@
     },
     {
       "id": "stage-5j",
-      "file": "docs/horsesteer-tests/stage-5j.md",
+      "file": "docs/tests/stage-5j.md",
       "checks": "Slow down first, then start",
       "status": "partial",
       "tasks": ["backward-walk"],
@@ -124,7 +124,7 @@
     },
     {
       "id": "stage-5k",
-      "file": "docs/horsesteer-tests/stage-5k.md",
+      "file": "docs/tests/stage-5k.md",
       "checks": "Later start, smaller reverse steering",
       "status": "passed",
       "tasks": ["backward-walk"],
@@ -132,7 +132,7 @@
     },
     {
       "id": "stage-6",
-      "file": "docs/horsesteer-tests/stage-6.md",
+      "file": "docs/tests/stage-6.md",
       "checks": "Final backward walk (v0.0.1)",
       "status": "passed",
       "tasks": ["backward-walk"],
@@ -140,7 +140,7 @@
     },
     {
       "id": "stage-7",
-      "file": "docs/horsesteer-tests/stage-7.md",
+      "file": "docs/tests/stage-7.md",
       "checks": "New addresses after the game patch",
       "status": "passed",
       "tasks": ["startup-lookups"],
@@ -148,7 +148,7 @@
     },
     {
       "id": "stage-8",
-      "file": "docs/horsesteer-tests/stage-8.md",
+      "file": "docs/tests/stage-8.md",
       "checks": "Logging the mount's chart state and velocity",
       "status": "passed",
       "tasks": [],
@@ -156,7 +156,7 @@
     },
     {
       "id": "stage-9",
-      "file": "docs/horsesteer-tests/stage-9.md",
+      "file": "docs/tests/stage-9.md",
       "checks": "Speed from velocity",
       "status": "partial",
       "tasks": ["backward-walk"],
@@ -164,7 +164,7 @@
     },
     {
       "id": "stage-9b",
-      "file": "docs/horsesteer-tests/stage-9b.md",
+      "file": "docs/tests/stage-9b.md",
       "checks": "Reverse steering release with position speed put back, on flat ground",
       "status": "passed",
       "tasks": ["backward-walk"],
@@ -172,7 +172,7 @@
     },
     {
       "id": "stage-9c",
-      "file": "docs/horsesteer-tests/stage-9c.md",
+      "file": "docs/tests/stage-9c.md",
       "checks": "The same with velocity restored, to separate the speed change from the ground",
       "status": "passed",
       "tasks": ["backward-walk"],
@@ -180,7 +180,7 @@
     },
     {
       "id": "stage-9d",
-      "file": "docs/horsesteer-tests/stage-9d.md",
+      "file": "docs/tests/stage-9d.md",
       "checks": "Forward pulse when the chart state leaves the walk during the backward walk",
       "status": "passed",
       "tasks": ["backward-walk"],
@@ -188,7 +188,7 @@
     },
     {
       "id": "stage-10",
-      "file": "docs/horsesteer-tests/stage-10.md",
+      "file": "docs/tests/stage-10.md",
       "checks": "Addresses found at startup, with riding, backward walk and taming",
       "status": "passed",
       "tasks": ["startup-lookups", "taming-pause"],
@@ -196,7 +196,7 @@
     },
     {
       "id": "stage-10b",
-      "file": "docs/horsesteer-tests/stage-10b.md",
+      "file": "docs/tests/stage-10b.md",
       "checks": "A failed lookup leaves the mod idle, and the post-win freeze with no hooks",
       "status": "partial",
       "tasks": ["startup-lookups"],
@@ -204,7 +204,7 @@
     },
     {
       "id": "stage-11",
-      "file": "docs/horsesteer-tests/stage-11.md",
+      "file": "docs/tests/stage-11.md",
       "checks": "Controls and backward walk on each ground mount, with mount identity logging",
       "status": "partial",
       "date": "2026-11-05",
@@ -213,7 +213,7 @@
     },
     {
       "id": "stage-11b",
-      "file": "docs/horsesteer-tests/stage-11b.md",
+      "file": "docs/tests/stage-11b.md",
       "checks": "Memory scan of each mount for a name that works, and the stage 11 steps with a key that forces the controls on",
       "status": "passed",
       "date": "2026-11-05",
@@ -222,7 +222,7 @@
     },
     {
       "id": "stage-12",
-      "file": "docs/horsesteer-tests/stage-12.md",
+      "file": "docs/tests/stage-12.md",
       "checks": "Mounts recognised without End, speeds from HorseSteer.ini, and a pulse when A or D is released in reverse",
       "status": "partial",
       "date": "2026-11-05",
@@ -231,7 +231,7 @@
     },
     {
       "id": "stage-12b",
-      "file": "docs/horsesteer-tests/stage-12b.md",
+      "file": "docs/tests/stage-12b.md",
       "checks": "Pulses when the mount's chart value goes missing during the backward walk",
       "status": "passed",
       "date": "2026-11-05",
@@ -240,7 +240,7 @@
     },
     {
       "id": "stage-13",
-      "file": "docs/horsesteer-tests/stage-13.md",
+      "file": "docs/tests/stage-13.md",
       "checks": "Controls and backward walk with the test keys removed",
       "status": "passed",
       "date": "2026-11-05",
@@ -249,7 +249,7 @@
     },
     {
       "id": "stage-14",
-      "file": "docs/horsesteer-tests/stage-14.md",
+      "file": "docs/tests/stage-14.md",
       "checks": "Controls and backward walk on wagons",
       "status": "passed",
       "date": "2026-11-06",
@@ -258,7 +258,7 @@
     },
     {
       "id": "stage-15",
-      "file": "docs/horsesteer-tests/stage-15.md",
+      "file": "docs/tests/stage-15.md",
       "checks": "S as the wagon's brake reverse, reverse steering ramp",
       "status": "partial",
       "date": "2026-11-06",
@@ -267,7 +267,7 @@
     },
     {
       "id": "stage-16",
-      "file": "docs/horsesteer-tests/stage-16.md",
+      "file": "docs/tests/stage-16.md",
       "checks": "Finding the animal pulling the wagon and logging its angle, and the horse's reverse steering without the ramp",
       "status": "partial",
       "date": "2026-11-06",
@@ -276,7 +276,7 @@
     },
     {
       "id": "stage-17",
-      "file": "docs/horsesteer-tests/stage-17.md",
+      "file": "docs/tests/stage-17.md",
       "checks": "Rotations around the wagon and its animal, for the animal's angle to the wagon",
       "status": "failed",
       "date": "2026-11-06",
@@ -285,7 +285,7 @@
     },
     {
       "id": "stage-18",
-      "file": "docs/horsesteer-tests/stage-18.md",
+      "file": "docs/tests/stage-18.md",
       "checks": "Horse's state recovery pulse limited to above 0.3 m/s",
       "status": "passed",
       "date": "2026-11-06",
@@ -294,7 +294,7 @@
     },
     {
       "id": "stage-19",
-      "file": "docs/horsesteer-tests/stage-19.md",
+      "file": "docs/tests/stage-19.md",
       "checks": "Shift+F5 removed, Toggle key setting, InvertSteer on the horse, another mount and the wagon",
       "status": "passed",
       "date": "2026-11-07",
@@ -304,7 +304,7 @@
     },
     {
       "id": "stage-20",
-      "file": "docs/horsesteer-tests/stage-20.md",
+      "file": "docs/tests/stage-20.md",
       "checks": "Missing ini settings added with defaults at startup",
       "status": "passed",
       "date": "2026-11-07",
@@ -314,7 +314,7 @@
     },
     {
       "id": "stage-21",
-      "file": "docs/horsesteer-tests/stage-21.md",
+      "file": "docs/tests/stage-21.md",
       "checks": "W+S raw stick, gait after a stick gap, and a position write against forward motion",
       "status": "partial",
       "date": "2026-11-08",
@@ -324,7 +324,7 @@
     },
     {
       "id": "stage-22",
-      "file": "docs/horsesteer-tests/stage-22.md",
+      "file": "docs/tests/stage-22.md",
       "checks": "Ending a stick gap at the next lower gait's speed, on the bear and camel, with and without the position write",
       "status": "partial",
       "date": "2026-11-08",
@@ -334,7 +334,7 @@
     },
     {
       "id": "stage-23",
-      "file": "docs/horsesteer-tests/stage-23.md",
+      "file": "docs/tests/stage-23.md",
       "checks": "Tap and hold of S to slow every ground mount, the [Slowdown] setting, and the position write on longer drops",
       "status": "passed",
       "date": "2026-11-08",
@@ -344,7 +344,7 @@
     },
     {
       "id": "stage-24",
-      "file": "docs/horsesteer-tests/stage-24.md",
+      "file": "docs/tests/stage-24.md",
       "checks": "The game's brake key starting the slowdown, with drift kept",
       "status": "partial",
       "date": "2026-11-08",
@@ -354,7 +354,7 @@
     },
     {
       "id": "stage-25",
-      "file": "docs/horsesteer-tests/stage-25.md",
+      "file": "docs/tests/stage-25.md",
       "checks": "Brake key taps on the horse, needing two consecutive slowing states",
       "status": "passed",
       "date": "2026-11-08",
@@ -364,7 +364,7 @@
     },
     {
       "id": "stage-26",
-      "file": "docs/horsesteer-tests/stage-26.md",
+      "file": "docs/tests/stage-26.md",
       "checks": "The slowdown on the wagon, from S and the brake key at every speed",
       "status": "passed",
       "date": "2026-11-08",
@@ -374,7 +374,7 @@
     },
     {
       "id": "stage-27",
-      "file": "docs/horsesteer-tests/stage-27.md",
+      "file": "docs/tests/stage-27.md",
       "checks": "A wagon tap at cruise ending below 5 m/s instead of on the time cap",
       "status": "partial",
       "date": "2026-11-08",
@@ -384,7 +384,7 @@
     },
     {
       "id": "stage-28",
-      "file": "docs/horsesteer-tests/stage-28.md",
+      "file": "docs/tests/stage-28.md",
       "checks": "Wagon taps with the position write skipped",
       "status": "passed",
       "date": "2026-11-08",
@@ -394,7 +394,7 @@
     },
     {
       "id": "stage-29",
-      "file": "docs/horsesteer-tests/stage-29.md",
+      "file": "docs/tests/stage-29.md",
       "checks": "A slowdown ending once the mount is below 0.3 m/s",
       "status": "passed",
       "date": "2026-11-08",
@@ -404,7 +404,7 @@
     },
     {
       "id": "stage-30",
-      "file": "docs/horsesteer-tests/stage-30.md",
+      "file": "docs/tests/stage-30.md",
       "checks": "StickDeadzone: a gamepad pulled back slightly off center walking backward instead of spinning",
       "status": "passed",
       "date": "2026-11-09",
@@ -414,7 +414,7 @@
     },
     {
       "id": "stage-31",
-      "file": "docs/horsesteer-tests/stage-31.md",
+      "file": "docs/tests/stage-31.md",
       "checks": "CameraDetached and TapBrake feature flags in each new combination",
       "status": "passed",
       "date": "2026-11-09",
@@ -424,14 +424,14 @@
     },
     {
       "id": "stage-32",
-      "file": "docs/horsesteer-tests/stage-32.md",
+      "file": "docs/tests/stage-32.md",
       "checks": "The Reload key reading the ini while the game runs",
       "status": "not_run",
       "tasks": ["reload-key"]
     },
     {
       "id": "stage-33",
-      "file": "docs/horsesteer-tests/stage-33.md",
+      "file": "docs/tests/stage-33.md",
       "checks": "PHC_SetSuspended from a test caller, with two owners and the toggle",
       "status": "passed",
       "date": "2026-11-09",
@@ -441,7 +441,7 @@
     },
     {
       "id": "stage-34",
-      "file": "docs/horsesteer-tests/stage-34.md",
+      "file": "docs/tests/stage-34.md",
       "checks": "KeyRampMs at 0 and 50 ms: standing W+A starts and gallop steering",
       "status": "partial",
       "date": "2026-11-10",
@@ -451,7 +451,7 @@
     },
     {
       "id": "stage-35",
-      "file": "docs/horsesteer-tests/stage-35.md",
+      "file": "docs/tests/stage-35.md",
       "checks": "A 100 ms minimum ramp from standing, with KeyRampMs=0",
       "status": "passed",
       "date": "2026-11-10",
@@ -461,7 +461,7 @@
     },
     {
       "id": "stage-36",
-      "file": "docs/horsesteer-tests/stage-36.md",
+      "file": "docs/tests/stage-36.md",
       "checks": "Steering bias settings at the defaults, 0 and 1, changed with Reload",
       "status": "passed",
       "date": "2026-11-10",
@@ -471,7 +471,7 @@
     },
     {
       "id": "stage-37",
-      "file": "docs/horsesteer-tests/stage-37.md",
+      "file": "docs/tests/stage-37.md",
       "checks": "Game update 0x6AF5D198: the wildcarded condition count and the physicsSlot lookup",
       "status": "passed",
       "date": "2026-11-13",
@@ -481,7 +481,7 @@
     },
     {
       "id": "stage-38",
-      "file": "docs/horsesteer-tests/stage-38.md",
+      "file": "docs/tests/stage-38.md",
       "checks": "Probe logging the mount's T10 results from slot 77, without changing them",
       "status": "passed",
       "date": "2026-11-14",
@@ -491,7 +491,7 @@
     },
     {
       "id": "stage-39",
-      "file": "docs/horsesteer-tests/stage-39.md",
+      "file": "docs/tests/stage-39.md",
       "checks": "Braking while turning, by answering T10 for the mount during a slowdown instead of zeroing the stick",
       "status": "failed",
       "date": "2026-11-14",
@@ -501,7 +501,7 @@
     },
     {
       "id": "stage-40",
-      "file": "docs/horsesteer-tests/stage-40.md",
+      "file": "docs/tests/stage-40.md",
       "checks": "Probe logging every slot 77 read during a gap, with its caller and actor",
       "status": "passed",
       "date": "2026-11-14",
@@ -511,7 +511,7 @@
     },
     {
       "id": "stage-41",
-      "file": "docs/horsesteer-tests/stage-41.md",
+      "file": "docs/tests/stage-41.md",
       "checks": "Writing 0 to the mount's T10 cache byte during a gap, as well as answering slot 77",
       "status": "failed",
       "date": "2026-11-14",
@@ -521,7 +521,7 @@
     },
     {
       "id": "stage-42",
-      "file": "docs/horsesteer-tests/stage-42.md",
+      "file": "docs/tests/stage-42.md",
       "checks": "Answering TE as not holding as well as T10 as holding, during a gap",
       "status": "passed",
       "date": "2026-11-14",
@@ -531,7 +531,7 @@
     },
     {
       "id": "stage-43",
-      "file": "docs/horsesteer-tests/stage-43.md",
+      "file": "docs/tests/stage-43.md",
       "checks": "Probe logging the mount's T167 reads, possibly the gear Shift selects",
       "status": "passed",
       "date": "2026-11-14",
@@ -541,7 +541,7 @@
     },
     {
       "id": "stage-44",
-      "file": "docs/horsesteer-tests/stage-44.md",
+      "file": "docs/tests/stage-44.md",
       "checks": "One gait down per tap on non-horse mounts, by answering T66 until the state changes",
       "status": "partial",
       "date": "2026-11-14",
@@ -551,7 +551,7 @@
     },
     {
       "id": "stage-45",
-      "file": "docs/horsesteer-tests/stage-45.md",
+      "file": "docs/tests/stage-45.md",
       "checks": "S taps on non-horse mounts, with move input answered until S is released",
       "status": "passed",
       "date": "2026-11-14",
@@ -561,7 +561,7 @@
     },
     {
       "id": "stage-46",
-      "file": "docs/horsesteer-tests/stage-46.md",
+      "file": "docs/tests/stage-46.md",
       "checks": "Probe for the controlled actor after switching to a follower, by input census and pointer hunt",
       "status": "passed",
       "date": "2026-11-16",
@@ -571,7 +571,7 @@
     },
     {
       "id": "stage-47",
-      "file": "docs/horsesteer-tests/stage-47.md",
+      "file": "docs/tests/stage-47.md",
       "checks": "Controls on the controlled character's mount, including a follower's, from [[manager+0x58]+0xD8]",
       "status": "passed",
       "date": "2026-11-16",
@@ -581,7 +581,7 @@
     },
     {
       "id": "stage-48",
-      "file": "docs/horsesteer-tests/stage-48.md",
+      "file": "docs/tests/stage-48.md",
       "checks": "Holding the brake key, S with W, or the stick back on non-horse mounts steps down every gait to a stop",
       "status": "partial",
       "date": "2026-11-16",
@@ -591,7 +591,7 @@
     },
     {
       "id": "stage-49",
-      "file": "docs/horsesteer-tests/stage-49.md",
+      "file": "docs/tests/stage-49.md",
       "checks": "Holds step down only after 500 ms, and UpdateBrakeGap runs for the mount's input only",
       "status": "passed",
       "date": "2026-11-16",
@@ -601,7 +601,7 @@
     },
     {
       "id": "taming-minigame",
-      "file": "docs/horsesteer-tests/taming-minigame.md",
+      "file": "docs/tests/taming-minigame.md",
       "checks": "Controls with the mod paused",
       "status": "passed",
       "tasks": ["taming-pause"],

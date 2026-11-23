@@ -23,8 +23,8 @@ The mod finds its addresses at startup ([offsets.md](findings/offsets.md)), and 
 - **Optional:** `keyCheck`, `conditionTableCall` and the slot 77 lookup. If one fails, or the rodeo switch doesn't
   install, the log reads `not found (optional)` and setup ends with `MOD ACTIVE without <features>`. The feature drops
   out or falls back, such as the zeroed-stick slowdown when slot 77 isn't found.
-- **Planned:** any failed check turns the whole mod off, instead of running with parts missing (`regression-shutdown`
-  in [state/tasks.json](state/tasks.json)).
+- **A failed check** turns the whole mod off. Running with only the failed parts dropped is `regression-shutdown` in
+  [state/tasks.json](state/tasks.json).
 
 The lookups don't cover every field the mod reads. On `0x6AF5D198` the physics object moved from `+0x2C0` to `+0x2D0`
 with every lookup passing, which is why `g_physicsSlot` is looked up and `tools/check_fields.py` exists. After a game

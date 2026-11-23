@@ -15,7 +15,7 @@ for new offsets, or port them with its `PORTING-3479.md` method using `../_share
 ## Used by `HorseSteer` and working in game
 
 Addresses are from Steam build 26423880, PE timestamp `0x6AEA07A6`; `KNOWN` in `tools/check_lookups.py` has each
-later build's. [stage-10](../horsesteer-tests/stage-10.md) found all of these in live memory on that build, and tested them in game, including the rodeo slot.
+later build's. [stage-10](../tests/stage-10.md) found all of these in live memory on that build, and tested them in game, including the rodeo slot.
 
 | Variable in `HorseSteer.cpp` | Address | Lookup | What it is |
 | --- | --- | --- | --- |
@@ -25,7 +25,7 @@ later build's. [stage-10](../horsesteer-tests/stage-10.md) found all of these in
 | `g_hookSite` | `0xB6D526` | Signature | Input update, right after the camera vectors are copied |
 | `g_stickSite` | `0xB6D626` | Signature | Input update, right before the raw stick is read from `+0x48` |
 | `g_keyCheck` | `0x3B0750` | Signature, not required | Chart key condition handler, type `0xEA`. `InstallBrakeKey` checks the table slot holds it |
-| `g_conditionTableCall` | `0x3AA79C` | Signature, not required | A call to the chart condition handler table's getter, `0x3AA5C0`, which is Denuvo-mutated. Found in [stage 15](../horsesteer-tests/stage-15.md) |
+| `g_conditionTableCall` | `0x3AA79C` | Signature, not required | A call to the chart condition handler table's getter, `0x3AA5C0`, which is Denuvo-mutated. Found in [stage 15](../tests/stage-15.md) |
 | `g_physicsSlot` | `+0x2C0` | 8-aligned 64-bit load after the actor's `+0x68`, `+0x40`, `+0x140` chain, at least 3 times the next | The physics object's offset. `+0x2D0` on `0x6AF5D198` |
 | `g_vtRodeoUi` | `0x5A75218` | RTTI | `UIGamePlayControlRootMiniGameRodeo` vtable; slot 47 runs each frame of the minigame |
 
@@ -69,13 +69,13 @@ Steam build 26423880, unless an item names another.
     `OR` and `NOT`. The stale chart extracts number those `0x287` to `0x289`, from before the type count rose by 4.
     After either slot, it stores the type at `[rbp]`, the result at `[rbp+4]` and the counter at `[rbx]` at `[rbp+8]`.
     Its slot 77 call returns to `exe+0x2691BE2`, the only caller logged during gaps in
-    [stage 40](../horsesteer-tests/stage-40.md).
+    [stage 40](../tests/stage-40.md).
   - **Cache refresh:** the game rewrites `T10`'s cache byte about once a frame
-    ([stage 41](../horsesteer-tests/stage-41.md)).
+    ([stage 41](../tests/stage-41.md)).
   - **Lookup:** `HorseSteer` finds the vtable by RTTI and slot 77 by `kCachedConditionSignature`, whatever `Logging` is
-    set to, from [stage 39](../horsesteer-tests/stage-39.md) on. `tools/check_lookups.py` checks both builds.
+    set to, from [stage 39](../tests/stage-39.md) on. `tools/check_lookups.py` checks both builds.
   - **`T167`:** handler table slot `0x167 - 0x83`, reached through the same table as `key_brake`. With `Logging=1` the
-    [stage 43](../horsesteer-tests/stage-43.md) probe logs its handler's address.
+    [stage 43](../tests/stage-43.md) probe logs its handler's address.
 - **From other projects, not yet checked on this install:**
   - The image base is fixed at `0x140000000`, and part of the code is mutated by Denuvo, so some functions may only be
     readable in live memory (CrimsonDesertCoop).
@@ -99,7 +99,7 @@ Checked against build 26423880's exe:
 - **Key query:** the signature has one match, `exe+0x30CAFD0`.
 - **Chart runtime path:** the code at `exe+0xBC6B38` reads `control = [[actor+0x68]+0x40]`, `index = byte [[control+0x30]+0x1B]` and `runtime = [[control+index*8+0x88]+0x18]`.
 
-Logged on the mount in `HorseSteer` in [stage 8](../horsesteer-tests/stage-8.md), and readable on both horses it rode:
+Logged on the mount in `HorseSteer` in [stage 8](../tests/stage-8.md), and readable on both horses it rode:
 
 - **Chart state:** `state = [runtime+0x28]`. If byte `[state+0x7A]` is 1–32, `value` is the float at `[runtime+0x38] + word [state+0x78] + 0x18`. How a pointer maps to a node number is unknown, and both horses showed
   the same pointers. `state` holds through a steady gait, with short excursions to other states. `value` is constant within a state and looks like a target speed, though what it means is unconfirmed. It's missing in idle states.

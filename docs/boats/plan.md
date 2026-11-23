@@ -15,7 +15,7 @@ Ship Manager before setting sail.
 Set `Logging=1` in `bin64\ProperHorseControls.ini`, then sail with the mod inactive. Fill in the "In game" column of
 [the predictions table](static-findings.md#predictions-to-check-in-game), starting with 2 to 5, and read the ship's
 package name from the `mount package not recognised` log line. Copy the logs to `scratch/probe-runs/` before they can be
-deleted. Write the test as a new file in [../horsesteer-tests/](../horsesteer-tests/), and point `boats-sail-1` in
+deleted. Write the test as a new file in [../tests/](../tests/), and point `boats-sail-1` in
 [../state/tests.json](../state/tests.json) at it.
 
 ## Decision

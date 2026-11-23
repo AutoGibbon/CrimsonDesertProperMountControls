@@ -65,8 +65,8 @@ Build 1.0.0.3479.
 
 ## Wagon
 
-Build `0x6AEB7D59`. Tested on `cd_r0004_05_wagon` in [stage 14](../horsesteer-tests/stage-14.md) and
-[stage 15](../horsesteer-tests/stage-15.md). Logs are in `scratch/probe-runs/wagon-1/` (mod inactive), `stage14/`,
+Build `0x6AEB7D59`. Tested on `cd_r0004_05_wagon` in [stage 14](../tests/stage-14.md) and
+[stage 15](../tests/stage-15.md). Logs are in `scratch/probe-runs/wagon-1/` (mod inactive), `stage14/`,
 `stage14-steer024/`, `stage14-steer010/` and `stage15/`.
 
 - **Package and charts:** the wagon's package is `CD_R0012_Wagon_0001`, read as `cd_r0012_wagon_0001`, and its chart is
@@ -92,7 +92,7 @@ Build `0x6AEB7D59`. Tested on `cd_r0004_05_wagon` in [stage 14](../horsesteer-te
   to 0.5 m/s and stays there, while `mount_phys_yaw` turns at a steady 58 to 60°/s from the first row. That's a circle
   of about 0.5 m radius. With D held for 6 s the wagon turned a full 360° at that rate. In one run with A held, the rate
   fell to about 8°/s after 2.3 s and 140°. In straight reverse, `travel_yaw` matches `mount_phys_yaw`.
-- **Taps in `E14A` ([stage 16](../horsesteer-tests/stage-16.md)):** A held for 0.2 to 0.3 s turns the wagon 15 to 18°,
+- **Taps in `E14A` ([stage 16](../tests/stage-16.md)):** A held for 0.2 to 0.3 s turns the wagon 15 to 18°,
   and a shorter tap 9°. The rate ramps to 60°/s over about 0.3 s and back to 0 over about 0.3 s after release, speed
   dips to about 0.8 m/s, and the wagon then reverses straight along its new heading. Holding A gives 62°/s while speed
   falls to 0.5 m/s.
@@ -112,7 +112,7 @@ Build `0x6AEB7D59`. Tested on `cd_r0004_05_wagon` in [stage 14](../horsesteer-te
 
 ## Wagon slowdown
 
-Build `0x6AED2E85`, stages [26](../horsesteer-tests/stage-26.md) to [28](../horsesteer-tests/stage-28.md). Nodes are from
+Build `0x6AED2E85`, stages [26](../tests/stage-26.md) to [28](../tests/stage-28.md). Nodes are from
 `r0012_wagon_upper`. That condition `TC9` tests speed is inferred, and matches the logged speeds. State IDs change between
 sessions.
 

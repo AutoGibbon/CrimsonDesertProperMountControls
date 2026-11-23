@@ -5,7 +5,7 @@ Investigation into, and potentially a native ASI mod for, replicating RDR2's hor
 results (`tests.json`) and the game build, deployed builds and installed mods (`environment.json`).
 `docs/discovery.md` has requirements, `docs/horsesteer-design.md` and `docs/slowdown.md` say how the mod works,
 `docs/findings/` has evidence and open questions by topic, `docs/boats/` has the ship plan and evidence,
-`docs/horsesteer-tests/` has each test's steps, results and the log formats, and `docs/horseprobe/` has the finished
+`docs/tests/` has each test's steps, results and the log formats, and `docs/horseprobe/` has the finished
 probe's docs.
 
 ## Session routine
@@ -72,7 +72,7 @@ For a release, follow the `release` skill. `python tools/pack.py` builds, then w
 
 ## Working notes
 
-- **Tests:** write each new test as a new file in `docs/horsesteer-tests/`, which also explains the logs, and add it to
+- **Tests:** write each new test as a new file in `docs/tests/`, which also explains the logs, and add it to
   `docs/state/tests.json`. `HorseSteer` only traces with
   `Logging=1` in `ProperHorseControls.ini`, and the zip from `tools/pack.py` ships with it off, so a test's setup must turn it on in `bin64`. `LogProblem`
   writes regardless, and launching with `Logging=0` deletes earlier logs, so copy them first.

@@ -48,14 +48,14 @@ Constraints from the tester, for any S-based slowdown:
   `mount_value` returned to 14 within about 1 s.
 - **A gait only rises with Shift, and holds once Shift is released.** Holding W keeps the current gait, and each Shift
   tap raises it one gait: walk, trot, canter, gallop 1 and gallop 2 (the gait table is in
-  [horsesteer-tests/README.md](../horsesteer-tests/README.md)). A mount skill gives faster travel for a time past
+  [tests/README.md](../tests/README.md)). A mount skill gives faster travel for a time past
   gallop 2, and needs W and Shift held. After a slowdown, the mount stays at the lower gait until Shift is tapped.
 - **Mount speeds can't be a static table.** Mounts differ in stats, several horse breeds have different top speed and
   acceleration, and trust level changes those further. Maximum stats also take riding time to unlock, so logging each
   mount in live play isn't practical. Anything scaled to a mount, such as a position write, must be derived from the
   current mount as it's ridden.
 
-Results from [stage 21](../horsesteer-tests/stage-21.md), on the horse, on build `0x6AED2E85`:
+Results from [stage 21](../tests/stage-21.md), on the horse, on build `0x6AED2E85`:
 
 - **Raw stick:** W and S held together read 0 on `+0x48`, so the stick can't tell that from releasing W, and the horse
   stops as it does on a release. Detecting S during W needs a key read.
@@ -70,14 +70,14 @@ Results from [stage 21](../horsesteer-tests/stage-21.md), on the horse, on build
 - **Bear and camel:** the second-state rule lands on the bear's 5.2 and the camel's 3.5 from any higher gait, because of
   the shared slowing node below. Under those gaits, the second state has no `mount_value`, so the gap ends on its time
   cap with the mount nearly stopped.
-- **Ending the gap at the next lower gait's speed ([stage 22](../horsesteer-tests/stage-22.md)):** W returning partway
+- **Ending the gap at the next lower gait's speed ([stage 22](../tests/stage-22.md)):** W returning partway
   through the shared slowing node does resume a higher gait. On the bear, 12 of 12 taps from 13.3, 9.2 and 5.2 landed
   one gait lower. On the camel, 3.5 to 2.6 worked, but 9.0 released at about 6.1 m/s landed on 3.5, for a cause not
   traced. With no lower gait to target, a tap at the lowest gait still runs to the time cap.
 - **Position write at `AssistPerSecond=0.4` on those mounts:** shortens the gaps by about a quarter, peaking at 2.0 m/s,
   and the tester saw no problem with the feet.
 - **Position write removed:** on the wagon, `mount_vel` jumped by up to 2 m/s when it ended
-  ([stage 27](../horsesteer-tests/stage-27.md)), and the tester could see it on the horse's animation more often than
+  ([stage 27](../tests/stage-27.md)), and the tester could see it on the horse's animation more often than
   not. Without it, the bear's 5.2 tap took the same 2.1 to 2.2 s, on `reason=next state` (`probe-runs/bear-no-assist/`).
 - **Stopped mounts:** in 10 saved runs, 25 of 279 taps ended on the time cap, 16 of them on the bear and camel's low gaits
   under the older end rules, after 0.8 to 2.0 s below 0.3 m/s. `UpdateBrakeGap` now also ends below `kBrakeGapStopSpeed`
@@ -109,7 +109,7 @@ The wagon has two slowing nodes, split by speed: see [mounts-and-vehicles.md](mo
 
 ## Slowing a mount with the brake key
 
-From [stage 24](../horsesteer-tests/stage-24.md) and [stage 25](../horsesteer-tests/stage-25.md), on build `0x6AED2E85`.
+From [stage 24](../tests/stage-24.md) and [stage 25](../tests/stage-25.md), on build `0x6AED2E85`.
 `tools/brake_gaps.py LOG CSV` tabulates each tap's start value, landing value, duration and whether it bounced.
 
 - **`key_brake` moves the chart early:** on the horse, the first change into the slowing state comes about 15 ms after
@@ -178,7 +178,7 @@ is, so steering continues, and `TE` as not holding (below). `key_brake` and drif
   and `T1E3(4, v)`, and going down is on `OR T1E3(5, v) NOT T167(...)`. Its `v` values are 5.0, 9.0 and 13.0. The
   horse's chart uses `T167` 125 times: its canter needs `T167(4, 0)` and its gallop `T167(5, 0)`. `T167` may be the
   gear Shift selects, and `T1E3` may check the mount's stats, which would explain gaits unlocking with level.
-  [Stage 43](../horsesteer-tests/stage-43.md) found `T167` answering 0 for every read all session, so it isn't the
+  [Stage 43](../tests/stage-43.md) found `T167` answering 0 for every read all session, so it isn't the
   gear. It's probably "gait `k` is unlocked". Mounts other than the horse have no levels, and every gait is available
   from the start (tester), so on them it would always hold.
 - **One gait down on `T66`:** in the charts extracted for `0x6AF5D198` (`scratch/out/charts-6AF5D198/`), each gait
@@ -215,22 +215,22 @@ is, so steering continues, and `TE` as not holding (below). `key_brake` and drif
   make them leave one gait down. `TC9` is type `0xC9`, so it goes through the handler table `InstallBrakeKey` patches.
   This wasn't tried: the `T66` step down does it instead ([slowdown.md](../slowdown.md)).
 
-- **Encoding ([stage 38](../horsesteer-tests/stage-38.md)):** slot 77 returns 0 when `T10` holds and 1 otherwise, and
+- **Encoding ([stage 38](../tests/stage-38.md)):** slot 77 returns 0 when `T10` holds and 1 otherwise, and
   `T10` is "no move input". Any stick input counts, including x alone and a sent y of 0.03. The horse, bear, camel and
   wolf all read `T10` through slot 77, and every change to 0 came on the tick the chart entered a slowing state. So
   answering 0 for the mount should be enough to send each chart into its slowing node.
 
-- **Answering slot 77 alone ([stage 39](../horsesteer-tests/stage-39.md)):** fails. The chart enters the slowing state
+- **Answering slot 77 alone ([stage 39](../tests/stage-39.md)):** fails. The chart enters the slowing state
   on the answer and leaves it on the next frame, every 30 to 50 ms, on the horse from a canter and on the wolf, with or
   without steering. The check that keeps the chart in the slowing state, the in-branch's second condition program
   (`OR T10 key_brake` on the horse), doesn't see the answer. Gallop taps pass through `D85C` and work.
-  [Stage 40](../horsesteer-tests/stage-40.md) found that only the interpreter's entry check reads `T10` through slot 77,
-  once per entry. [Stage 41](../horsesteer-tests/stage-41.md) wrote 0 to the cache byte too, and it still flipped.
+  [Stage 40](../tests/stage-40.md) found that only the interpreter's entry check reads `T10` through slot 77,
+  once per entry. [Stage 41](../tests/stage-41.md) wrote 0 to the cache byte too, and it still flipped.
 - **What sends the chart back:** the horse's slowing states branch back up to a gait on `TE` (type `0x0E`) and not
   `key_brake`, such as node 0 to node 82: `AND T167(4, 0) TC9(4.2,4)`, then `AND OR TE AND TE key_run NOT key_brake`.
   `TE` reads 0 for the mount while there's stick input, so it looks like "move input", the opposite of `T10`. A zeroed
   stick fails it and a held brake key fails `NOT key_brake`, which is why both stay down, and why a brake key tap without
-  the mod bounces. [Stage 42](../horsesteer-tests/stage-42.md) answered `TE` as not holding during a gap as well, and
+  the mod bounces. [Stage 42](../tests/stage-42.md) answered `TE` as not holding during a gap as well, and
   passed on the horse and bear: no flipping, one gait per tap on the horse, and turning at the usual 52 to 74°/s.
 
 A mount keeps turning in its slowing node with x held (stage 42). The answer is limited to the mount actor, as
@@ -252,7 +252,7 @@ Build 1.0.0.3479, unless a bullet names another.
   count. The count is `0x286` up to `0x6AED2E85` and `0x28A` on `0x6AF5D198`, so the signature has a wildcard for it.
   On build
   `0x6AEB7D59` the getter is `0x3AA5C0` and the key handler `0x3B0750`. Replacing the slot works there alongside the
-  other mod's hook, and on the wagon the actor at the context's `+8` is the wagon ([stage 15](../horsesteer-tests/stage-15.md)).
+  other mod's hook, and on the wagon the actor at the context's `+8` is the wagon ([stage 15](../tests/stage-15.md)).
 - **Installed mods:** Combat Evolved swaps riding charts such as `ride_upper` and `ride_weapon_upper`, and its strings show
   no movement or steering code. It logs a game key check at `exe+0x3B0150` on build 1.0.0.3479, which may help with reading
   game input.
