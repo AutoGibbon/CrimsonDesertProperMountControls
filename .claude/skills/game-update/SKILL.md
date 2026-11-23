@@ -40,7 +40,8 @@ still worked, while the true shift, the physics object from `+0x2C0` to `+0x2D0`
 1. If `../_shared/exe-baseline/` has no copy of the new exe, copy it there as `CrimsonDesert_<timestamp>.exe`, with the
    timestamp in uppercase hex as in the existing names. Keep the older copies.
 2. Add the build to `KNOWN` in `tools/check_lookups.py` with the addresses it printed, commented
-   `# Steam build of <date>, not yet tested in game`, and run step 1 again to confirm every line reads `ok`.
+   `# Steam build of <date>`, and run step 1 again to confirm every line reads `ok`. Once an in-game test has run on
+   the build, add `; in-game test <test id>` to the comment.
 3. Set `exe_timestamp` and `exe_seen` under `facts` in `docs/state/environment.json`.
 4. Propose an in-game smoke test: `Logging=1` in `bin64\ProperHorseControls.ini`, ride the horse, and check that
    `bin64\ProperHorseControls.log` reaches `MOD ACTIVE: all features enabled.` If the user agrees, write it as a new test
