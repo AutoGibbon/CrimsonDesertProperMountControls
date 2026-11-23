@@ -50,14 +50,14 @@
     { "name": "ImprovedAxiomManeuver", "on": true },
     { "name": "SkillVideoFix", "on": true },
     { "name": "VAXISDestruction", "on": true },
-    { "name": "WeatherMod", "on": true, "notes": "The user's own mod, from another project" },
+    { "name": "ProperWeather", "on": true, "notes": "The user's own mod, from the weatherMod project" },
     {
       "name": "CrimsonRoute",
       "on": false,
-      "notes": "In DMM\\mods but not in bin64. Its auto move conflicts on mounts; see the README's compatibility section"
+      "notes": "In DMM\\mods but not in bin64. Compatible from its 9.2.0, which calls PHC_SetSuspended"
     },
     { "name": "CrimsonBodyWeatherSnowMaskTest", "on": false, "notes": "In DMM\\mods but not in bin64" },
-    { "name": "Seasons", "on": false, "notes": "Seasons.asi in DMM\\mods; bin64 has only Seasons.ini" },
+    { "name": "Seasons", "on": false, "notes": "Seasons.asi in DMM\\mods\\Seasons; bin64 has only Seasons.ini" },
     {
       "name": "DMM data mods",
       "on": true,

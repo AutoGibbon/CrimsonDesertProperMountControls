@@ -41,7 +41,7 @@ still worked, while the true shift, the physics object from `+0x2C0` to `+0x2D0`
    timestamp in uppercase hex as in the existing names. Keep the older copies.
 2. Add the build to `KNOWN` in `tools/check_lookups.py` with the addresses it printed, commented
    `# Steam build of <date>, not yet tested in game`, and run step 1 again to confirm every line reads `ok`.
-3. Set `exe_timestamp` and `exe_seen` under `facts` in `docs/state/environment.json`, and its `updated` date.
+3. Set `exe_timestamp` and `exe_seen` under `facts` in `docs/state/environment.json`.
 4. Propose an in-game smoke test: `Logging=1` in `bin64\ProperHorseControls.ini`, ride the horse, and check that
    `bin64\ProperHorseControls.log` reaches `MOD ACTIVE: all features enabled.` If the user agrees, write it as a new test
    in `docs/horsesteer-tests/`, with a `planned` entry in `docs/state/tests.json`.

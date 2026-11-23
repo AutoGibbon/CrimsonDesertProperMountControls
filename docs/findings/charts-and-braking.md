@@ -127,7 +127,8 @@ From [stage 24](../horsesteer-tests/stage-24.md) and [stage 25](../horsesteer-te
 ## Slowing while steering
 
 On build `0x6AF5D198` with v1.3.1, the brake key, or S with A or D, while turning at a canter or above doesn't slow
-the mount unless the brake key is held. Below a canter, a tap slows it. Logs are in `scratch/probe-runs/gamepad-drift-1/`
+the mount unless the brake key is held; 1.4.0 fixed this (see "Turning taps" below). Below a canter, a tap slows it.
+Logs are in `scratch/probe-runs/gamepad-drift-1/`
 (KBM and gamepad, with a mod-off stretch) and `scratch/probe-runs/slow-steer-2/` (KBM, gamepad, and gamepad with
 `CameraDetached=0`).
 
@@ -137,9 +138,13 @@ the mount unless the brake key is held. Below a canter, a tap slows it. Logs are
   next went on to `B7CC`. Trot and below move on at once, so a tap works there.
 - **Why the mod's straight taps work:** the gap zeroes the stick, which keeps `T10` true until the next state. With
   `CameraDetached=0` every press starts a gap, and all 11 dropped a gait, 7 of them from `C2B2` through `C5AF`.
-- **Why turning taps don't:** `UpdateBrakeGap` won't start a gap while `steering` and ends one on `reason=steering`. With
-  steering, a brake key press leaves only `key_brake`. In `slow-steer-2`, 6 of 11 canter presses with `steering=1`
-  returned to `C2B2` within 30 to 95 ms, and the other 5 reached `B7CC`, which the tester confirmed were held presses.
+- **Turning taps:** since 1.4.0 (task `brake-while-turning`), a gap answers `T10` as holding and `TE` as not through
+  slot 77 and leaves the stick as is, so a turning tap drops one gait while steering carries on (`stage-42`,
+  `stage-45`); see [slowdown.md](../slowdown.md). Steering still blocks a gap when slot 77 isn't found, because the gap
+  then zeroes the stick. With v1.3.1, `UpdateBrakeGap` didn't start a gap while `steering` and ended one on
+  `reason=steering`, so a brake key press left only `key_brake`: in `slow-steer-2`, 6 of 11 canter presses with
+  `steering=1` returned to `C2B2` within 30 to 95 ms, and the other 5 reached `B7CC`, which the tester confirmed were
+  held presses.
 - **S with A or D:** the S tap needs W held, so with W released no gap starts. The mod writes y = 0 with x = ±1, which
   the chart treats as a canter turn. In `gamepad-drift-1`, 4.6 s of S with D and 8.1 s of S with A kept the canter.
 
