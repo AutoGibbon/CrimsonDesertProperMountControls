@@ -15,21 +15,29 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV = ROOT / "docs" / "state" / "environment.json"
-TEMPLATE_CHECK_STATE = Path.home() / ".claude" / "skills" / "project-scaffold" / "templates" / "check_state.py"
+TEMPLATES = Path.home() / ".claude" / "skills" / "project-scaffold" / "templates"
+# Scripts each project copies unchanged from TEMPLATES.
+COPIED_SCRIPTS = ("check_state.py", "tasks.py")
 
 
-def template_note():
-    """Return a note if tools/check_state.py differs from the user's template, ignoring line endings; else None."""
-    ours = ROOT / "tools" / "check_state.py"
-    if not (TEMPLATE_CHECK_STATE.is_file() and ours.is_file()):
-        return None
+def template_notes():
+    """Return a note for each of COPIED_SCRIPTS that is missing from tools/ or differs from its template."""
 
     def norm(path):
         return path.read_bytes().replace(b"\r\n", b"\n")
 
-    if norm(ours) != norm(TEMPLATE_CHECK_STATE):
-        return "tools/check_state.py differs from the project-scaffold template (see the project-state-migrate audit)"
-    return None
+    notes = []
+    for name in COPIED_SCRIPTS:
+        ours, template = ROOT / "tools" / name, TEMPLATES / name
+        if not template.is_file():
+            continue
+        if not ours.is_file():
+            notes.append(f"tools/{name} is missing; copy it from the project-scaffold template")
+        elif norm(ours) != norm(template):
+            notes.append(
+                f"tools/{name} differs from the project-scaffold template (see the project-state-migrate audit)"
+            )
+    return notes
 
 
 def run(*args):
@@ -127,10 +135,10 @@ def main():
         problems += artefact_checks(env)
     for p in problems:
         print(f"  ! {p}")
-    note = template_note()
-    if note:
+    notes = template_notes()
+    for note in notes:
         print(f"  note: {note}")
-    if not problems and not note:
+    if not problems and not notes:
         print("  ok")
 
     print("\n== state", flush=True)
