@@ -13,6 +13,7 @@ probe's docs.
 - **Start:** the `SessionStart` hook runs `tools/session_start.py` and its output is in context; if it isn't, run the
   script. Raise any problems it reports with the user, then read `docs/status.md`. Work on the `next` items in
   `docs/state/tasks.json` unless the user says otherwise.
+- **Queries:** list, show and trace tasks and tests with `tools/tasks.py`, not one-off scripts over the JSON.
 - **Starting a task:** agree its `done_when` with the user when setting it `in_progress`. Check the open questions in
   the findings docs the task touches; one it depends on becomes a task or a `done_when` line now.
 - **During:** update a JSON entry in `docs/state/` when its state changes, not at the end. When a result answers an
