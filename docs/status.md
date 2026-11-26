@@ -13,7 +13,7 @@ Current focus, half-done work and gotchas for the next session. Rewritten at the
 
 ## Half done
 
-Nothing. `bin64\ProperHorseControls.ini` still has `Logging=1` from stage-50.
+Nothing.
 
 ## Gotchas
 

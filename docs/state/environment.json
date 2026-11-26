@@ -26,7 +26,7 @@
       "commit": "045f9de",
       "date": "2026-11-16",
       "enabled": true,
-      "notes": "Copied from DMM on apply. bin64/ProperHorseControls.ini has Logging=1, left on after stage-50"
+      "notes": "Copied from DMM on apply. bin64/ProperHorseControls.ini has Logging=0; set Logging=1 there before a test"
     },
     {
       "name": "ProperHorseControls-1.4.1.zip",
