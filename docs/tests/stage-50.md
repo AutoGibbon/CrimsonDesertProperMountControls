@@ -44,4 +44,24 @@ Close the game and copy `bin64\ProperHorseControls.log` and `.csv` to `scratch/p
 
 ## Results
 
+Run on 2026-11-26 with a DMM profile holding only ProperHorseControls and ProperWeather, on a save with the horse,
+bear, wolf and camel. Logs are in `scratch/probe-runs/stage50/run1/` (horses `B0100002` and `B0100003`) and `run2/`
+(horse `B0100002`, wolf `B0100004`, bear `B0100005`, camel `B0100006`).
+
+- **Setup:** both runs log `PE timestamp 0x6B07E5E9`, every lookup found, `lookup cachedConditionSlot: 78` and
+  `MOD ACTIVE: all features enabled.` No problem lines.
+- **Steering:** the stick is rewritten on every mount, such as `raw stick -1.000, 1.000 sent -0.147, 1.407` on the
+  bear, and backward input is turned forward for the reverse walk on the wolf and bear.
+- **Horse:** four brake taps each give one `brake gap start` and `brake gap end ... reason=next state` within 62 to
+  422 ms, one gait down each. No brake hold to a stop was logged on the horse; stops came from releasing W.
+- **Wolf, bear, camel:** each tap gives one `step down start ... source=brake key` and its `step down end ...
+  reason=gait changed`, one gait down. Each hold steps down one gait per `source=hold` at about 500 ms intervals, then
+  `brake gap start ... source=no step` and `brake gap end ... reason=stopped` at 0.28 to 0.30 m/s.
+
 ## Conclusion
+
+Passed: v1.4.1 is MOD ACTIVE on 0x6B07E5E9, steering and brake taps work on all four mounts, holds stop the wolf, bear
+and camel.
+
+Verified on `0x6B07E5E9`: the update doesn't affect v1.4.1. The horse's brake hold to a stop wasn't exercised; it uses
+the same `brake gap` path the taps did.

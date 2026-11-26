@@ -104,7 +104,7 @@ KNOWN = {
         "cachedCondition": 0x3AE380,
         "cachedConditionSlot": 77,
     },
-    0x6B07E5E9: {  # Steam build of 2026-11-26
+    0x6B07E5E9: {  # Steam build of 2026-11-26; in-game test stage-50
         "vtActorManager": 0x5B56000,
         "vtVehicleComponent": 0x5B55CE8,
         "vtRodeoUi": 0x5C87B68,

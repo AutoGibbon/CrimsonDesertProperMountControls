@@ -303,16 +303,16 @@
       "id": "update-6b07e5e9",
       "workstream": "land-mounts",
       "title": "Game update 0x6B07E5E9: static checks and v1.4.1 in game",
-      "status": "blocked",
+      "status": "done",
       "done_when": [
         "Every static check in the game-update skill passes on 0x6B07E5E9",
         "Test stage-50 passes with the deployed v1.4.1 build"
       ],
       "depends_on": [],
       "evidence": [
-        "check_lookups.py, check_fields.py and check_charts.py (CDMW c504d77) all passed on 0x6B07E5E9 on 2026-11-26"
+        "check_lookups.py, check_fields.py and check_charts.py (CDMW c504d77) all passed on 0x6B07E5E9 on 2026-11-26",
+        "stage-50 passed"
       ],
-      "blocked_by": "a DMM update; DMM doesn't work on 0x6B07E5E9, so stage-50 can't run",
       "detail": "docs/tests/stage-50.md",
       "updated": "2026-11-26"
     }

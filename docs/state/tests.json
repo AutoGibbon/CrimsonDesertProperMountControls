@@ -618,9 +618,11 @@
       "id": "stage-50",
       "file": "docs/tests/stage-50.md",
       "checks": "v1.4.1 reaches MOD ACTIVE on 0x6B07E5E9, and steering and braking work on the horse and one other mount",
-      "status": "planned",
+      "status": "passed",
+      "date": "2026-11-26",
       "build": "0x6B07E5E9",
-      "tasks": ["update-6b07e5e9"]
+      "tasks": ["update-6b07e5e9"],
+      "result": "Passed: v1.4.1 is MOD ACTIVE on 0x6B07E5E9, steering and brake taps work on all four mounts, holds stop the wolf, bear and camel"
     }
   ]
 }

@@ -26,7 +26,7 @@
       "commit": "045f9de",
       "date": "2026-11-16",
       "enabled": true,
-      "notes": "Copied from DMM on apply. bin64/ProperHorseControls.ini has Logging=1 for stage-50"
+      "notes": "Copied from DMM on apply. bin64/ProperHorseControls.ini has Logging=1, left on after stage-50"
     },
     {
       "name": "ProperHorseControls-1.4.1.zip",
@@ -40,7 +40,7 @@
     {
       "name": "DmmRuntime.asi and winmm.dll loader",
       "on": true,
-      "notes": "Load the asi mods. DMM doesn't work on 0x6B07E5E9 and awaits an update (2026-11-26)"
+      "notes": "Load the asi mods. DMM was updated for 0x6B07E5E9 on 2026-11-26. A DMM profile with only ProperHorseControls and ProperWeather exists, used by stage-50 with a save holding the horse, bear, wolf and camel"
     },
     { "name": "ReShade (dxgi.dll) with RenoDX and LODFix-by-Sharky addons", "on": true, "notes": "Rendering only" },
     { "name": "AmbientMixer", "on": true },
