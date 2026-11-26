@@ -25,5 +25,9 @@ Current focus, half-done work and gotchas for the next session. Rewritten at the
 - **Chart tools:** `tools/chart_node_branches.py` and `tools/chart_branches.py` don't know the `0x28E` logic tokens of
   `0x6B07E5E9` ([charts-and-braking.md](findings/charts-and-braking.md)), so they misread `AND`, `OR` and `NOT` on this
   build until fixed the way `tools/check_charts.py` was.
+- **DMM broken:** on `0x6B07E5E9` DMM doesn't work. Before an in-game task, including `boats-reach-ship`, ask the user
+  whether the game runs and with which mods.
+- **Boats findings build:** [boats/static-findings.md](boats/static-findings.md) predates `0x6B07E5E9`. Re-check the
+  addresses and chart tokens its predictions rely on before `boats-sail-1`.
 - **Extracts:** the ones in `scratch/out/` that the session start check lists predate the current build. Regenerate
   them with `tools/` before relying on them.
