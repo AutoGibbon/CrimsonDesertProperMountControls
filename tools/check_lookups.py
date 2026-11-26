@@ -104,6 +104,21 @@ KNOWN = {
         "cachedCondition": 0x3AE380,
         "cachedConditionSlot": 77,
     },
+    0x6B07E5E9: {  # Steam build of 2026-11-26
+        "vtActorManager": 0x5B56000,
+        "vtVehicleComponent": 0x5B55CE8,
+        "vtRodeoUi": 0x5C87B68,
+        "rodeoUiSlot0": 0x12A73C0,
+        "worldSystemSlot": 0x73F0D50,
+        "hookSite": 0xBEF0B6,
+        "stickSite": 0xBEF1B6,
+        "keyCheck": 0x3C0150,
+        "conditionTableCall": 0x3B9B3C,
+        "physicsSlot": 0x2D0,
+        "vtControlComponent": 0x5B54DA0,
+        "cachedCondition": 0x3B99E0,
+        "cachedConditionSlot": 78,
+    },
 }
 
 

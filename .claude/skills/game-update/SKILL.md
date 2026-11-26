@@ -17,7 +17,7 @@ Run all three, even after one fails.
 1. `tools/check_lookups.py GAME/bin64/CrimsonDesert.exe BASE`. The first line gives the new PE timestamp. If it's
    already in `KNOWN`, the exe hasn't changed, so skip steps 1 and 3, but still run step 2, because the charts ship
    separately from the exe.
-2. `tools/check_charts.py GAME ../_shared/cdmw-src scratch/out/charts-check`. The wagon reports `UNCHECKED` every time.
+2. `tools/check_charts.py GAME ../_shared/cdmw-src scratch/out/charts-check`.
 3. `tools/check_fields.py BASE GAME/bin64/CrimsonDesert.exe`.
 
 ## If a check fails

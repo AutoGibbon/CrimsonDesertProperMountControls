@@ -2,9 +2,9 @@
   "schema": 1,
   "facts": {
     "game_dir": "Z:/SteamLibrary/steamapps/common/Crimson Desert",
-    "exe_timestamp": "0x6AFDC0CF",
-    "exe_seen": "2026-11-20",
-    "exe_baselines": "../_shared/exe-baseline/ holds 0x6AED2E85, 0x6AF5D198 and 0x6AFDC0CF",
+    "exe_timestamp": "0x6B07E5E9",
+    "exe_seen": "2026-11-26",
+    "exe_baselines": "../_shared/exe-baseline/ holds 0x6AED2E85, 0x6AF5D198, 0x6AFDC0CF and 0x6B07E5E9",
     "dlc": "dlc_01 (Charting the Unknown), installed 2026-11-08 in dlc/dlc_01/",
     "test_save": "save slot 1, edited to add mounts other than the horse when a test needs them",
     "nexus_version": "1.4.1"
@@ -26,7 +26,7 @@
       "commit": "045f9de",
       "date": "2026-11-16",
       "enabled": true,
-      "notes": "Copied from DMM on apply. bin64/ProperHorseControls.ini has Logging=0; set Logging=1 there before a test"
+      "notes": "Copied from DMM on apply. bin64/ProperHorseControls.ini has Logging=1 for stage-50"
     },
     {
       "name": "ProperHorseControls-1.4.1.zip",
@@ -37,7 +37,11 @@
     }
   ],
   "installed": [
-    { "name": "DmmRuntime.asi and winmm.dll loader", "on": true, "notes": "Load the asi mods" },
+    {
+      "name": "DmmRuntime.asi and winmm.dll loader",
+      "on": true,
+      "notes": "Load the asi mods. DMM doesn't work on 0x6B07E5E9 and awaits an update (2026-11-26)"
+    },
     { "name": "ReShade (dxgi.dll) with RenoDX and LODFix-by-Sharky addons", "on": true, "notes": "Rendering only" },
     { "name": "AmbientMixer", "on": true },
     { "name": "AutoLetThereBeLight", "on": true },

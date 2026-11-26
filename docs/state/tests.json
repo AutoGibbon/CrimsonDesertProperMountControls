@@ -613,6 +613,14 @@
       "checks": "Predictions 1 to 16 checked by sailing a ship with Logging=1 and the mod inactive",
       "status": "planned",
       "tasks": ["boats-sail-observe"]
+    },
+    {
+      "id": "stage-50",
+      "file": "docs/tests/stage-50.md",
+      "checks": "v1.4.1 reaches MOD ACTIVE on 0x6B07E5E9, and steering and braking work on the horse and one other mount",
+      "status": "planned",
+      "build": "0x6B07E5E9",
+      "tasks": ["update-6b07e5e9"]
     }
   ]
 }

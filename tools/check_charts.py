@@ -11,8 +11,9 @@ Extracts the ride charts of every mount the mod supports into OUT_DIR, then chec
   down on AND T66 NOT key_run (type 0x66).
 
 Prints PASS or FAIL per chart and per check, and exits with 1 if any check fails. A chart CDMW can't decode is
-printed as UNCHECKED and doesn't fail the run; the wagon's has been one since a game update after 2026-11-03.
+printed as UNCHECKED and doesn't fail the run.
 """
+
 import re
 import struct
 import sys
@@ -69,8 +70,9 @@ def branches(path: Path):
     ix = span["conditionInstanceArray indices"]
     indices = struct.unpack_from(f"<{ix.count}H", d, ix.offset)
     starts = sorted(set(indices))
-    # Game update 0x6AF5D198 moved AND, OR and NOT from 0x287 up to 0x28B up, where 0x287 became an ordinary type.
-    logic = 0x28B if any(dw[s] in (0x28B, 0x28C, 0x28D) for s in starts) else 0x287
+    # Use the newest base whose AND, OR and NOT appear: game update 0x6AF5D198 moved them from 0x287 to 0x28B, where
+    # 0x287 became an ordinary type, and 0x6B07E5E9 moved them to 0x28E.
+    logic = next((b for b in (0x28E, 0x28B, 0x287) if any(dw[s] in (b, b + 1, b + 2) for s in starts)), 0x287)
 
     def show(i):
         n = next((s for s in starts if s > i), len(dw))
@@ -107,21 +109,33 @@ def check(name: str, edges) -> list[tuple[str, bool, str]]:
     results = []
     into_slowing = [(s, t) for s, t, a, b in edges if a == "" and has(b, "T10") and t is not None and t != s]
     slowing = {t for _, t in into_slowing}
-    results.append(("T10 into slowing", bool(into_slowing),
-                    f"{len(into_slowing)} branches from {len({s for s, _ in into_slowing})} nodes"))
+    results.append(
+        (
+            "T10 into slowing",
+            bool(into_slowing),
+            f"{len(into_slowing)} branches from {len({s for s, _ in into_slowing})} nodes",
+        )
+    )
     if name == HORSE:
-        back_up = [(s, t) for s, t, a, b in edges
-                   if s in slowing and t != s and has(b, "TE") and "NOT key_brake" in b]
+        back_up = [(s, t) for s, t, a, b in edges if s in slowing and t != s and has(b, "TE") and "NOT key_brake" in b]
         results.append(("TE back up from slowing", bool(back_up), f"{len(back_up)} branches, such as {back_up[:3]}"))
     if name in STEP_DOWN:
         gaits = {s for s, _ in into_slowing}
-        up = {(s, t) for s, t, a, b in edges
-              if s in gaits and t in gaits and t != s and has(b, "key_run") and "NOT key_run" not in b}
+        up = {
+            (s, t)
+            for s, t, a, b in edges
+            if s in gaits and t in gaits and t != s and has(b, "key_run") and "NOT key_run" not in b
+        }
         down = {(s, t) for s, t, a, b in edges if t is not None and t != s and has(b, "T66") and "NOT key_run" in b}
         missing = sorted((t, s) for s, t in up if (t, s) not in down)
         ladder_ok = len(up) >= 3 and not missing
-        results.append(("T66 step down per Shift step up", ladder_ok,
-                        f"{len(up)} steps up {sorted(up)}, missing steps down {missing or 'none'}"))
+        results.append(
+            (
+                "T66 step down per Shift step up",
+                ladder_ok,
+                f"{len(up)} steps up {sorted(up)}, missing steps down {missing or 'none'}",
+            )
+        )
     return results
 
 

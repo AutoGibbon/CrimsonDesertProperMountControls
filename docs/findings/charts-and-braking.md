@@ -210,6 +210,11 @@ is, so steering continues, and `TE` as not holding (below). `key_brake` and drif
   tokens in [offsets.md](offsets.md) are confirmed. Types from about `0x1E3` up moved by 2 or 3, such as `T1E3` to
   `T1E5` and `T27E` to `T281`. `T10`, `TE`, `T66`, `T167`, `TC9` and `key_brake` kept their numbers.
   `tools/chart_node_branches.py` and `tools/chart_branches.py` pick the numbering from the chart.
+- **Chart numbering on `0x6B07E5E9`:** Verified on `0x6B07E5E9`. `AND`, `OR` and `NOT` moved again, to `0x28E`, `0x28F`
+  and `0x290`. `T10`, `TE`, `T66`, `0xEA` (`key_*`) and `key_brake` kept their numbers in the horse and wolf charts. The
+  charts use CDMW's new `2.06` layout, which CDMW reads from commit `c504d77`; older checkouts misread it as non-empty
+  ShareValue sections. `tools/check_charts.py` knows `0x28E`; `chart_node_branches.py` and `chart_branches.py` still only
+  know `0x287` and `0x28B`.
 - **One-gait drops on other mounts:** `T10` gets them into their slowing node, but they still leave it at the node's
   fixed `TC9` speed. Answering that `TC9` as true at the next gait's speed, while the chart is in the slowing node, could
   make them leave one gait down. `TC9` is type `0xC9`, so it goes through the handler table `InstallBrakeKey` patches.
